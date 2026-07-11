@@ -1,0 +1,23 @@
+model Feedback {
+  id                Int       @id @default(autoincrement())
+  branchId          Int       @map("branch_id")
+  guestName         String    @map("guest_name")
+  contact           String?
+  foodRating        Int       @db.TinyInt @map("food_rating")
+  serviceRating     Int       @db.TinyInt @map("service_rating")
+  environmentRating Int       @db.TinyInt @map("environment_rating")
+  eventRating       Int       @db.TinyInt @map("event_rating")
+  overallRating     Int       @db.TinyInt @map("overall_rating")
+  heardAbout        HeardAbout? @map("heard_about")
+  ageGroup          AgeGroup?   @map("age_group")
+  opinion           String?   @db.Text
+  submittedAt       DateTime  @default(now()) @map("submitted_at")
+
+  branch Branch @relation(fields: [branchId], references: [id])
+
+  @@index([branchId])
+  @@index([submittedAt])
+  @@index([branchId, submittedAt])   // date-range + branch filter (reports, analytics)
+  @@index([branchId, overallRating]) // negative feedback filter (dashboard)
+  @@map("guest_feedbacks")
+}

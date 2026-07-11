@@ -1,0 +1,20 @@
+model Branch {
+  id        Int       @id @default(autoincrement())
+  name      String
+  code      String    @unique
+  address   String    @db.Text
+  phone     String?
+  latitude  Decimal   @db.Decimal(10, 8)
+  longitude Decimal   @db.Decimal(11, 8)
+  isActive  Boolean   @default(true) @map("is_active")
+  isDeleted Boolean   @default(false) @map("is_deleted")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  users     User[]
+  feedbacks Feedback[]
+
+  @@index([code, isActive])
+  @@index([isDeleted])
+  @@map("branches")
+}

@@ -1,0 +1,18 @@
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  BRANCH_MANAGER
+}
+
+enum HeardAbout {
+  SOCIAL_MEDIA
+  FRIENDS_AND_FAMILY
+  VISITED_BEFORE
+}
+
+enum AgeGroup {
+  BELOW_18
+  AGE_18_30
+  AGE_31_50
+  AGE_51_PLUS
+}

@@ -1,0 +1,20 @@
+model User {
+  id        Int      @id @default(autoincrement())
+  branchId  Int?     @map("branch_id")
+  name      String
+  email     String   @unique
+  password  String
+  role      Role
+  isActive  Boolean  @default(true) @map("is_active")
+  isDeleted Boolean  @default(false) @map("is_deleted")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  branch        Branch?        @relation(fields: [branchId], references: [id])
+  refreshTokens RefreshToken[]
+
+  @@index([email, role])
+  @@index([branchId])
+  @@index([isDeleted])
+  @@map("users")
+}
