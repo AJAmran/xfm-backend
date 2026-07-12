@@ -5,16 +5,25 @@ import { appError } from "../../utils/appError";
 import { CreateBranchInput, UpdateBranchInput, BranchQueryInput } from "./branch.validation";
 import { transformPagination, buildMetadata } from "../../utils/queryBuilder";
 
+const formatBranch = (branch: any) => {
+  if (!branch) return branch;
+  return {
+    ...branch,
+    ...(branch.latitude !== undefined ? { latitude: Number(branch.latitude) } : {}),
+    ...(branch.longitude !== undefined ? { longitude: Number(branch.longitude) } : {}),
+  };
+};
+
 export async function createBranch(payload: CreateBranchInput) {
   const existing = await prisma.branch.findUnique({ where: { code: payload.code } });
   if (existing) throw appError("A branch with this code already exists", httpStatus.CONFLICT);
-  return prisma.branch.create({ data: payload });
+  return formatBranch(await prisma.branch.create({ data: payload }));
 }
 
 export async function getBranchById(id: number) {
   const branch = await prisma.branch.findUnique({ where: { id, isDeleted: false } });
   if (!branch) throw appError("Branch not found", httpStatus.NOT_FOUND);
-  return branch;
+  return formatBranch(branch);
 }
 
 export async function getPaginatedBranches(query: BranchQueryInput) {
@@ -34,7 +43,7 @@ export async function getPaginatedBranches(query: BranchQueryInput) {
     prisma.branch.count({ where }),
   ]);
 
-  return { data, meta: buildMetadata(total, pagination) };
+  return { data: data.map(formatBranch), meta: buildMetadata(total, pagination) };
 }
 
 export async function updateBranch(id: number, payload: UpdateBranchInput) {
@@ -49,7 +58,7 @@ export async function updateBranch(id: number, payload: UpdateBranchInput) {
     if (dup) throw appError("A branch with this code already exists", httpStatus.CONFLICT);
   }
 
-  return prisma.branch.update({ where: { id }, data: payload });
+  return formatBranch(await prisma.branch.update({ where: { id }, data: payload }));
 }
 
 /**

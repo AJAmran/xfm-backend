@@ -1,0 +1,2097 @@
+{
+	"info": {
+		"name": "X-Group Feedback API",
+		"description": "Complete Postman collection for testing the X-Group Feedback System API.\n\n## Setup\n1. Import this collection\n2. Set the `BASE_URL` collection variable if needed (default: http://localhost:5000/api/v1)\n3. Run **Login — Super Admin** first to auto-populate tokens\n4. Use the **Login — Branch Manager** request to set `BRANCH_MANAGER_TOKEN`\n5. Use the **Login — Admin** request to set `ADMIN_TOKEN`\n\n## Notes\n- Refresh tokens are stateless (JWT-only, no DB storage). Logout is handled client-side by discarding the token.\n- The POST /auth/logout and POST /auth/refresh-token endpoints still work via cookies for convenience.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "BASE_URL",
+			"value": "http://localhost:5000/api/v1"
+		},
+		{
+			"key": "ACCESS_TOKEN",
+			"value": ""
+		},
+		{
+			"key": "ADMIN_TOKEN",
+			"value": ""
+		},
+		{
+			"key": "BRANCH_MANAGER_TOKEN",
+			"value": ""
+		},
+		{
+			"key": "SUPER_ADMIN_TOKEN",
+			"value": ""
+		}
+	],
+	"item": [
+		{
+			"name": "1. Health Check",
+			"item": [
+				{
+					"name": "✅ Server is running",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", () => {",
+									"  pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Response has success, status, uptime, timestamp, version\", () => {",
+									"  const json = pm.response.json();",
+									"  pm.expect(json.success).to.be.true;",
+									"  pm.expect(json.status).to.eql(\"ok\");",
+									"  pm.expect(json).to.have.property(\"uptime\");",
+									"  pm.expect(json).to.have.property(\"timestamp\");",
+									"  pm.expect(json.version).to.eql(\"v1\");",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/health",
+							"host": ["{{BASE_URL}}"],
+							"path": ["health"]
+						}
+					}
+				},
+				{
+					"name": "✅ Root endpoint",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:5000/",
+							"host": ["http://localhost:5000"],
+							"path": [""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Authentication",
+			"item": [
+				{
+					"name": "✅ Login — Super Admin",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const json = pm.response.json();",
+									"if (json.data && json.data.accessToken) {",
+									"  pm.collectionVariables.set(\"ACCESS_TOKEN\", json.data.accessToken);",
+									"  pm.collectionVariables.set(\"SUPER_ADMIN_TOKEN\", json.data.accessToken);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"superadmin@x-grouprestaurant.com\",\n  \"password\": \"SuperAdmin@123\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/auth/login",
+							"host": ["{{BASE_URL}}"],
+							"path": ["auth", "login"]
+						}
+					}
+				},
+				{
+					"name": "✅ Login — Admin",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const json = pm.response.json();",
+									"if (json.data && json.data.accessToken) {",
+									"  pm.collectionVariables.set(\"ADMIN_TOKEN\", json.data.accessToken);",
+									"  pm.collectionVariables.set(\"ACCESS_TOKEN\", json.data.accessToken);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"admin@x-grouprestaurant.com\",\n  \"password\": \"Admin@123\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/auth/login",
+							"host": ["{{BASE_URL}}"],
+							"path": ["auth", "login"]
+						}
+					}
+				},
+				{
+					"name": "✅ Login — Branch Manager (X-01)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const json = pm.response.json();",
+									"if (json.data && json.data.accessToken) {",
+									"  pm.collectionVariables.set(\"BRANCH_MANAGER_TOKEN\", json.data.accessToken);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"xian@x-grouprestaurant.com\",\n  \"password\": \"Xian@123\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/auth/login",
+							"host": ["{{BASE_URL}}"],
+							"path": ["auth", "login"]
+						}
+					}
+				},
+				{
+					"name": "❌ Login — Wrong password",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 401\", () => {",
+									"  pm.response.to.have.status(401);",
+									"});",
+									"pm.test(\"Error message is 'Incorrect password'\", () => {",
+									"  const json = pm.response.json();",
+									"  pm.expect(json.message).to.include(\"Incorrect password\");",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"admin@x-grouprestaurant.com\",\n  \"password\": \"WrongPassword\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/auth/login",
+							"host": ["{{BASE_URL}}"],
+							"path": ["auth", "login"]
+						}
+					}
+				},
+				{
+					"name": "❌ Login — Email not found",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 404\", () => {",
+									"  pm.response.to.have.status(404);",
+									"});",
+									"pm.test(\"Error message mentions email\", () => {",
+									"  const json = pm.response.json();",
+									"  pm.expect(json.message).to.include(\"email\");",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"notexist@test.com\",\n  \"password\": \"Admin@123\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/auth/login",
+							"host": ["{{BASE_URL}}"],
+							"path": ["auth", "login"]
+						}
+					}
+				},
+				{
+					"name": "❌ Login — Missing fields (Zod validation)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 422\", () => {",
+									"  pm.response.to.have.status(422);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"not-an-email\",\n  \"password\": \"short\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/auth/login",
+							"host": ["{{BASE_URL}}"],
+							"path": ["auth", "login"]
+						}
+					}
+				},
+				{
+					"name": "❌ Login — Empty body",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 422\", () => {",
+									"  pm.response.to.have.status(422);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/auth/login",
+							"host": ["{{BASE_URL}}"],
+							"path": ["auth", "login"]
+						}
+					}
+				},
+				{
+					"name": "✅ Get current user (me)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", () => {",
+									"  pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Response has user data without password\", () => {",
+									"  const json = pm.response.json();",
+									"  pm.expect(json.data).to.not.have.property(\"password\");",
+									"  pm.expect(json.data).to.have.property(\"email\");",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/auth/me",
+							"host": ["{{BASE_URL}}"],
+							"path": ["auth", "me"]
+						}
+					}
+				},
+				{
+					"name": "❌ Protected route — No token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 401\", () => {",
+									"  pm.response.to.have.status(401);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/auth/me",
+							"host": ["{{BASE_URL}}"],
+							"path": ["auth", "me"]
+						}
+					}
+				},
+				{
+					"name": "❌ Protected route — Invalid token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 401\", () => {",
+									"  pm.response.to.have.status(401);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer invalid.token.here"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/auth/me",
+							"host": ["{{BASE_URL}}"],
+							"path": ["auth", "me"]
+						}
+					}
+				},
+				{
+					"name": "✅ Refresh access token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const json = pm.response.json();",
+									"if (json.data && json.data.accessToken) {",
+									"  pm.collectionVariables.set(\"ACCESS_TOKEN\", json.data.accessToken);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/auth/refresh-token",
+							"host": ["{{BASE_URL}}"],
+							"path": ["auth", "refresh-token"]
+						}
+					}
+				},
+				{
+					"name": "❌ Refresh without cookie",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 401\", () => {",
+									"  pm.response.to.have.status(401);",
+									"});",
+									"pm.test(\"Message mentions refresh token\", () => {",
+									"  const json = pm.response.json();",
+									"  pm.expect(json.message).to.include(\"refresh\");",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/auth/refresh-token",
+							"host": ["{{BASE_URL}}"],
+							"path": ["auth", "refresh-token"]
+						}
+					}
+				},
+				{
+					"name": "✅ Logout",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/auth/logout",
+							"host": ["{{BASE_URL}}"],
+							"path": ["auth", "logout"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Branches",
+			"item": [
+				{
+					"name": "✅ Public — List active branches",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", () => {",
+									"  pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Returns array of active branches\", () => {",
+									"  const json = pm.response.json();",
+									"  pm.expect(json.data).to.be.an(\"array\");",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/branches/active",
+							"host": ["{{BASE_URL}}"],
+							"path": ["branches", "active"]
+						}
+					}
+				},
+				{
+					"name": "✅ Admin — List all branches (paginated)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/branches?page=1&limit=10&sortBy=name&sortOrder=asc",
+							"host": ["{{BASE_URL}}"],
+							"path": ["branches"],
+							"query": [
+								{ "key": "page", "value": "1" },
+								{ "key": "limit", "value": "10" },
+								{ "key": "sortBy", "value": "name" },
+								{ "key": "sortOrder", "value": "asc" }
+							]
+						}
+					}
+				},
+				{
+					"name": "✅ Admin — Filter by search",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/branches?search=Dhanmondi",
+							"host": ["{{BASE_URL}}"],
+							"path": ["branches"],
+							"query": [
+								{ "key": "search", "value": "Dhanmondi" }
+							]
+						}
+					}
+				},
+				{
+					"name": "✅ Admin — Filter by status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/branches?isActive=true",
+							"host": ["{{BASE_URL}}"],
+							"path": ["branches"],
+							"query": [
+								{ "key": "isActive", "value": "true" }
+							]
+						}
+					}
+				},
+				{
+					"name": "✅ Admin — Get branch by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/branches/1",
+							"host": ["{{BASE_URL}}"],
+							"path": ["branches", "1"]
+						}
+					}
+				},
+				{
+					"name": "❌ Branch not found",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 404\", () => {",
+									"  pm.response.to.have.status(404);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/branches/99999",
+							"host": ["{{BASE_URL}}"],
+							"path": ["branches", "99999"]
+						}
+					}
+				},
+				{
+					"name": "✅ Admin — Create branch",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", () => {",
+									"  pm.response.to.have.status(201);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Test Branch\",\n  \"code\": \"X-TEST\",\n  \"address\": \"123 Test Road, Dhaka\",\n  \"phone\": \"01700000000\",\n  \"latitude\": 23.7500,\n  \"longitude\": 90.3800\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/branches",
+							"host": ["{{BASE_URL}}"],
+							"path": ["branches"]
+						}
+					}
+				},
+				{
+					"name": "❌ Duplicate branch code",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 409\", () => {",
+									"  pm.response.to.have.status(409);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Duplicate\",\n  \"code\": \"X-01\",\n  \"address\": \"Any address\",\n  \"phone\": \"01700000000\",\n  \"latitude\": 23.75,\n  \"longitude\": 90.38\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/branches",
+							"host": ["{{BASE_URL}}"],
+							"path": ["branches"]
+						}
+					}
+				},
+				{
+					"name": "✅ Admin — Update branch",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phone\": \"01999999999\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/branches/1",
+							"host": ["{{BASE_URL}}"],
+							"path": ["branches", "1"]
+						}
+					}
+				},
+				{
+					"name": "✅ Admin — Deactivate branch",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"isActive\": false\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/branches/1/status",
+							"host": ["{{BASE_URL}}"],
+							"path": ["branches", "1", "status"]
+						}
+					}
+				},
+				{
+					"name": "✅ Admin — Soft delete branch",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", () => {",
+									"  pm.response.to.have.status(200);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/branches/1",
+							"host": ["{{BASE_URL}}"],
+							"path": ["branches", "1"]
+						}
+					}
+				},
+				{
+					"name": "❌ Branch Manager cannot manage branches",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 403\", () => {",
+									"  pm.response.to.have.status(403);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{BRANCH_MANAGER_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Unauthorized\",\n  \"code\": \"X-XX\",\n  \"address\": \"test\",\n  \"phone\": \"0111\",\n  \"latitude\": 23,\n  \"longitude\": 90\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/branches",
+							"host": ["{{BASE_URL}}"],
+							"path": ["branches"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "4. Feedback",
+			"item": [
+				{
+					"name": "✅ Submit feedback (full)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", () => {",
+									"  pm.response.to.have.status(201);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"branchId\": 1,\n  \"guestName\": \"John Doe\",\n  \"contact\": \"01711111111\",\n  \"foodRating\": 5,\n  \"serviceRating\": 4,\n  \"environmentRating\": 5,\n  \"eventRating\": 4,\n  \"overallRating\": 5,\n  \"heardAbout\": \"SOCIAL_MEDIA\",\n  \"ageGroup\": \"AGE_18_30\",\n  \"opinion\": \"Amazing experience!\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/feedbacks",
+							"host": ["{{BASE_URL}}"],
+							"path": ["feedbacks"]
+						}
+					}
+				},
+				{
+					"name": "✅ Submit minimal feedback",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", () => {",
+									"  pm.response.to.have.status(201);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"branchId\": 2,\n  \"guestName\": \"Jane\",\n  \"foodRating\": 4,\n  \"serviceRating\": 4,\n  \"environmentRating\": 4,\n  \"eventRating\": 3,\n  \"overallRating\": 4\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/feedbacks",
+							"host": ["{{BASE_URL}}"],
+							"path": ["feedbacks"]
+						}
+					}
+				},
+				{
+					"name": "❌ Invalid branchId (inactive/not found)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 404\", () => {",
+									"  pm.response.to.have.status(404);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"branchId\": 99999,\n  \"guestName\": \"Test\",\n  \"foodRating\": 4,\n  \"serviceRating\": 4,\n  \"environmentRating\": 4,\n  \"eventRating\": 4,\n  \"overallRating\": 4\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/feedbacks",
+							"host": ["{{BASE_URL}}"],
+							"path": ["feedbacks"]
+						}
+					}
+				},
+				{
+					"name": "❌ Rating below minimum (Zod)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 422\", () => {",
+									"  pm.response.to.have.status(422);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"branchId\": 1,\n  \"guestName\": \"Test\",\n  \"foodRating\": 1,\n  \"serviceRating\": 4,\n  \"environmentRating\": 4,\n  \"eventRating\": 4,\n  \"overallRating\": 4\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/feedbacks",
+							"host": ["{{BASE_URL}}"],
+							"path": ["feedbacks"]
+						}
+					}
+				},
+				{
+					"name": "❌ Invalid enum value (heardAbout)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 422\", () => {",
+									"  pm.response.to.have.status(422);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"branchId\": 1,\n  \"guestName\": \"Test\",\n  \"foodRating\": 4,\n  \"serviceRating\": 4,\n  \"environmentRating\": 4,\n  \"eventRating\": 4,\n  \"overallRating\": 4,\n  \"heardAbout\": \"INVALID_VALUE\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/feedbacks",
+							"host": ["{{BASE_URL}}"],
+							"path": ["feedbacks"]
+						}
+					}
+				},
+				{
+					"name": "✅ Admin — List feedbacks (paginated)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/feedbacks?page=1&limit=10",
+							"host": ["{{BASE_URL}}"],
+							"path": ["feedbacks"],
+							"query": [
+								{ "key": "page", "value": "1" },
+								{ "key": "limit", "value": "10" }
+							]
+						}
+					}
+				},
+				{
+					"name": "✅ Admin — Filter by branch",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/feedbacks?branchId=1&limit=5",
+							"host": ["{{BASE_URL}}"],
+							"path": ["feedbacks"],
+							"query": [
+								{ "key": "branchId", "value": "1" },
+								{ "key": "limit", "value": "5" }
+							]
+						}
+					}
+				},
+				{
+					"name": "✅ Admin — Filter by date range",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/feedbacks?startDate=2026-01-01&endDate=2026-07-11",
+							"host": ["{{BASE_URL}}"],
+							"path": ["feedbacks"],
+							"query": [
+								{ "key": "startDate", "value": "2026-01-01" },
+								{ "key": "endDate", "value": "2026-07-11" }
+							]
+						}
+					}
+				},
+				{
+					"name": "✅ Admin — Search by guest name",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/feedbacks?search=Rafiq",
+							"host": ["{{BASE_URL}}"],
+							"path": ["feedbacks"],
+							"query": [
+								{ "key": "search", "value": "Rafiq" }
+							]
+						}
+					}
+				},
+				{
+					"name": "✅ Admin — Filter by rating",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/feedbacks?rating=5",
+							"host": ["{{BASE_URL}}"],
+							"path": ["feedbacks"],
+							"query": [
+								{ "key": "rating", "value": "5" }
+							]
+						}
+					}
+				},
+				{
+					"name": "✅ Branch Manager — auto-scoped to own branch",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{BRANCH_MANAGER_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/feedbacks",
+							"host": ["{{BASE_URL}}"],
+							"path": ["feedbacks"]
+						}
+					}
+				},
+				{
+					"name": "⚠ Pagination abuse — max limit enforced",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Response should not return 999999 items\", () => {",
+									"  const json = pm.response.json();",
+									"  pm.expect(json.data.length).to.be.at.most(100);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/feedbacks?limit=999999",
+							"host": ["{{BASE_URL}}"],
+							"path": ["feedbacks"],
+							"query": [
+								{ "key": "limit", "value": "999999" }
+							]
+						}
+					}
+				},
+				{
+					"name": "✅ Get feedback by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/feedbacks/1",
+							"host": ["{{BASE_URL}}"],
+							"path": ["feedbacks", "1"]
+						}
+					}
+				},
+				{
+					"name": "❌ Feedback not found",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 404\", () => {",
+									"  pm.response.to.have.status(404);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/feedbacks/99999",
+							"host": ["{{BASE_URL}}"],
+							"path": ["feedbacks", "99999"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "5. Users",
+			"item": [
+				{
+					"name": "✅ Admin — Create user",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", () => {",
+									"  pm.response.to.have.status(201);",
+									"});",
+									"pm.test(\"Response has no password field\", () => {",
+									"  const json = pm.response.json();",
+									"  pm.expect(json.data).to.not.have.property(\"password\");",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Test Manager\",\n  \"email\": \"testmanager@x-grouprestaurant.com\",\n  \"password\": \"Test@1234\",\n  \"role\": \"BRANCH_MANAGER\",\n  \"branchId\": 1\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/users",
+							"host": ["{{BASE_URL}}"],
+							"path": ["users"]
+						}
+					}
+				},
+				{
+					"name": "❌ Duplicate email",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 409\", () => {",
+									"  pm.response.to.have.status(409);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Duplicate\",\n  \"email\": \"admin@x-grouprestaurant.com\",\n  \"password\": \"Admin@123\",\n  \"role\": \"ADMIN\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/users",
+							"host": ["{{BASE_URL}}"],
+							"path": ["users"]
+						}
+					}
+				},
+				{
+					"name": "✅ Admin — List users",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/users?page=1&limit=10&sortBy=name&sortOrder=asc",
+							"host": ["{{BASE_URL}}"],
+							"path": ["users"],
+							"query": [
+								{ "key": "page", "value": "1" },
+								{ "key": "limit", "value": "10" },
+								{ "key": "sortBy", "value": "name" },
+								{ "key": "sortOrder", "value": "asc" }
+							]
+						}
+					}
+				},
+				{
+					"name": "✅ Admin — Filter by role",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/users?role=BRANCH_MANAGER",
+							"host": ["{{BASE_URL}}"],
+							"path": ["users"],
+							"query": [
+								{ "key": "role", "value": "BRANCH_MANAGER" }
+							]
+						}
+					}
+				},
+				{
+					"name": "✅ Admin — Search users",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/users?search=Xian",
+							"host": ["{{BASE_URL}}"],
+							"path": ["users"],
+							"query": [
+								{ "key": "search", "value": "Xian" }
+							]
+						}
+					}
+				},
+				{
+					"name": "✅ Admin — Get user by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/users/1",
+							"host": ["{{BASE_URL}}"],
+							"path": ["users", "1"]
+						}
+					}
+				},
+				{
+					"name": "✅ Admin — Update user",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Updated Name\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/users/2",
+							"host": ["{{BASE_URL}}"],
+							"path": ["users", "2"]
+						}
+					}
+				},
+				{
+					"name": "✅ Admin — Deactivate user",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"isActive\": false\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/users/2/status",
+							"host": ["{{BASE_URL}}"],
+							"path": ["users", "2", "status"]
+						}
+					}
+				},
+				{
+					"name": "✅ Admin — Soft-delete user",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/users/2",
+							"host": ["{{BASE_URL}}"],
+							"path": ["users", "2"]
+						}
+					}
+				},
+				{
+					"name": "❌ Delete non-existent user",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 404\", () => {",
+									"  pm.response.to.have.status(404);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/users/99999",
+							"host": ["{{BASE_URL}}"],
+							"path": ["users", "99999"]
+						}
+					}
+				},
+				{
+					"name": "❌ Branch Manager cannot access users",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 403\", () => {",
+									"  pm.response.to.have.status(403);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{BRANCH_MANAGER_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/users",
+							"host": ["{{BASE_URL}}"],
+							"path": ["users"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "6. Dashboard",
+			"item": [
+				{
+					"name": "✅ Summary — Admin (all branches)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", () => {",
+									"  pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Response has all 5 data points\", () => {",
+									"  const json = pm.response.json();",
+									"  pm.expect(json.data).to.have.property(\"totalFeedbacks\");",
+									"  pm.expect(json.data).to.have.property(\"averageRatings\");",
+									"  pm.expect(json.data).to.have.property(\"negativeFeedbackCount\");",
+									"  pm.expect(json.data).to.have.property(\"ratingDistribution\");",
+									"  pm.expect(json.data).to.have.property(\"recentFeedbacks\");",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/dashboard/summary",
+							"host": ["{{BASE_URL}}"],
+							"path": ["dashboard", "summary"]
+						}
+					}
+				},
+				{
+					"name": "✅ Summary — Branch Manager (own branch only)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{BRANCH_MANAGER_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/dashboard/summary",
+							"host": ["{{BASE_URL}}"],
+							"path": ["dashboard", "summary"]
+						}
+					}
+				},
+				{
+					"name": "✅ Recent feedback",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/dashboard/recent-feedback",
+							"host": ["{{BASE_URL}}"],
+							"path": ["dashboard", "recent-feedback"]
+						}
+					}
+				},
+				{
+					"name": "✅ Branch ranking — Admin only",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", () => {",
+									"  pm.response.to.have.status(200);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/dashboard/branch-ranking",
+							"host": ["{{BASE_URL}}"],
+							"path": ["dashboard", "branch-ranking"]
+						}
+					}
+				},
+				{
+					"name": "❌ Branch Manager cannot see ranking",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 403\", () => {",
+									"  pm.response.to.have.status(403);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{BRANCH_MANAGER_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/dashboard/branch-ranking",
+							"host": ["{{BASE_URL}}"],
+							"path": ["dashboard", "branch-ranking"]
+						}
+					}
+				},
+				{
+					"name": "✅ Negative feedback",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/dashboard/negative-feedback",
+							"host": ["{{BASE_URL}}"],
+							"path": ["dashboard", "negative-feedback"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "7. Analytics",
+			"item": [
+				{
+					"name": "✅ Rating analytics",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", () => {",
+									"  pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Response has averages, totalFeedbacks, distribution\", () => {",
+									"  const json = pm.response.json();",
+									"  pm.expect(json.data).to.have.property(\"averages\");",
+									"  pm.expect(json.data).to.have.property(\"totalFeedbacks\");",
+									"  pm.expect(json.data).to.have.property(\"distribution\");",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/analytics/ratings",
+							"host": ["{{BASE_URL}}"],
+							"path": ["analytics", "ratings"]
+						}
+					}
+				},
+				{
+					"name": "✅ Branch performance — Admin only",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/analytics/branches",
+							"host": ["{{BASE_URL}}"],
+							"path": ["analytics", "branches"]
+						}
+					}
+				},
+				{
+					"name": "❌ Branch Manager cannot see all branch performance",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 403\", () => {",
+									"  pm.response.to.have.status(403);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{BRANCH_MANAGER_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/analytics/branches",
+							"host": ["{{BASE_URL}}"],
+							"path": ["analytics", "branches"]
+						}
+					}
+				},
+				{
+					"name": "✅ Monthly trends (DB-aggregated)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/analytics/monthly",
+							"host": ["{{BASE_URL}}"],
+							"path": ["analytics", "monthly"]
+						}
+					}
+				},
+				{
+					"name": "✅ Customer satisfaction",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/analytics/satisfaction",
+							"host": ["{{BASE_URL}}"],
+							"path": ["analytics", "satisfaction"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "8. Reports",
+			"item": [
+				{
+					"name": "✅ Daily report",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/reports/daily",
+							"host": ["{{BASE_URL}}"],
+							"path": ["reports", "daily"]
+						}
+					}
+				},
+				{
+					"name": "✅ Weekly report",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/reports/weekly",
+							"host": ["{{BASE_URL}}"],
+							"path": ["reports", "weekly"]
+						}
+					}
+				},
+				{
+					"name": "✅ Monthly report",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/reports/monthly",
+							"host": ["{{BASE_URL}}"],
+							"path": ["reports", "monthly"]
+						}
+					}
+				},
+				{
+					"name": "✅ Branch report — Admin specifying branch",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/reports/branch?branchId=1",
+							"host": ["{{BASE_URL}}"],
+							"path": ["reports", "branch"],
+							"query": [
+								{ "key": "branchId", "value": "1" }
+							]
+						}
+					}
+				},
+				{
+					"name": "✅ Branch report — Branch Manager (auto-scoped)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{BRANCH_MANAGER_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/reports/branch",
+							"host": ["{{BASE_URL}}"],
+							"path": ["reports", "branch"]
+						}
+					}
+				},
+				{
+					"name": "✅ Export Excel — all branches",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", () => {",
+									"  pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Content-Type is Excel\", () => {",
+									"  pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"spreadsheet\");",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/reports/export/excel",
+							"host": ["{{BASE_URL}}"],
+							"path": ["reports", "export", "excel"]
+						}
+					}
+				},
+				{
+					"name": "✅ Export Excel — date range filter",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/reports/export/excel?startDate=2026-01-01&endDate=2026-07-11",
+							"host": ["{{BASE_URL}}"],
+							"path": ["reports", "export", "excel"],
+							"query": [
+								{ "key": "startDate", "value": "2026-01-01" },
+								{ "key": "endDate", "value": "2026-07-11" }
+							]
+						}
+					}
+				},
+				{
+					"name": "✅ Export Excel — Branch Manager (own branch only)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{BRANCH_MANAGER_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/reports/export/excel",
+							"host": ["{{BASE_URL}}"],
+							"path": ["reports", "export", "excel"]
+						}
+					}
+				},
+				{
+					"name": "✅ Export PDF",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/reports/export/pdf",
+							"host": ["{{BASE_URL}}"],
+							"path": ["reports", "export", "pdf"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "9. Settings",
+			"item": [
+				{
+					"name": "✅ Get settings (public — no auth)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", () => {",
+									"  pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Response has settings fields\", () => {",
+									"  const json = pm.response.json();",
+									"  pm.expect(json.data).to.have.property(\"company_name\");",
+									"  pm.expect(json.data).to.have.property(\"contact_email\");",
+									"  pm.expect(json.data).to.have.property(\"feedback_form_active\");",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/settings",
+							"host": ["{{BASE_URL}}"],
+							"path": ["settings"]
+						}
+					}
+				},
+				{
+					"name": "✅ Super Admin — Update settings",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{SUPER_ADMIN_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"company_name\": \"X-Group Restaurants Ltd.\",\n  \"contact_phone\": \"01900000000\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/settings",
+							"host": ["{{BASE_URL}}"],
+							"path": ["settings"]
+						}
+					}
+				},
+				{
+					"name": "❌ Admin cannot update settings",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 403\", () => {",
+									"  pm.response.to.have.status(403);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ADMIN_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"company_name\": \"Unauthorized\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/settings",
+							"host": ["{{BASE_URL}}"],
+							"path": ["settings"]
+						}
+					}
+				},
+				{
+					"name": "❌ Branch Manager cannot update settings",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 403\", () => {",
+									"  pm.response.to.have.status(403);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{BRANCH_MANAGER_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"company_name\": \"Unauthorized\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/settings",
+							"host": ["{{BASE_URL}}"],
+							"path": ["settings"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "10. Edge Cases",
+			"item": [
+				{
+					"name": "❌ 404 — Unknown route",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 404\", () => {",
+									"  pm.response.to.have.status(404);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/nonexistent-endpoint",
+							"host": ["{{BASE_URL}}"],
+							"path": ["nonexistent-endpoint"]
+						}
+					}
+				},
+				{
+					"name": "⚠ Health — uptime increases over time",
+					"description": "Call this request twice a few seconds apart and verify that `uptime` increases.",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/health",
+							"host": ["{{BASE_URL}}"],
+							"path": ["health"]
+						}
+					}
+				}
+			]
+		}
+	]
+}

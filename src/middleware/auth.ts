@@ -41,7 +41,7 @@ export const authGuard = (...requiredRoles: Role[]) => {
 
     // Minimal DB check — only the fields required for session validation.
     const user = await prisma.user.findUnique({
-      where: { id: decoded.id, isDeleted: false },
+      where: { id: Number(decoded.id), isDeleted: false },
       select: { id: true, name: true, email: true, role: true, branchId: true, isActive: true },
     });
 

@@ -13,10 +13,9 @@ http://localhost:5000
 ```
 
 ### Start the server
-
 ```bash
 npm run dev
-```
+```fdddd
 
 ### Variables used in this guide
 
@@ -240,7 +239,7 @@ POST {{BASE}}/auth/logout
 Cookie: refreshToken=<your-refresh-token>
 ```
 
-**Expected 200:** Cookies cleared, token revoked.
+**Expected 200:** Cookies cleared.
 
 ---
 
@@ -1184,7 +1183,7 @@ curl -H "Authorization: Bearer $TOKEN" \
 - [ ] Access protected route with no token → 401
 - [ ] Access protected route with expired token → 401
 - [ ] Refresh token flow
-- [ ] Logout + verify refresh token is revoked (try using it again → 401)
+- [ ] Logout + verify cookies are cleared
 - [ ] Login with wrong password → 401
 - [ ] Trigger auth rate limit → 429
 

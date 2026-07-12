@@ -18,28 +18,20 @@ import { SettingsRoutes } from "./modules/settings/settings.routes";
 
 const app: Application = express();
 
-// ─── Security headers (must be first) ────────────────────────────────────────
-// https://helmetjs.github.io/
 app.use(helmet());
 
-// ─── CORS ─────────────────────────────────────────────────────────────────────
 app.use(cors({ origin: env.app_url, credentials: true }));
 
-// ─── Request parsing ──────────────────────────────────────────────────────────
 app.use(cookieParser());
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 
-// ─── Response compression ─────────────────────────────────────────────────────
 app.use(compression());
 
-// ─── Request logging (status + response time) ────────────────────────────────
 app.use(requestLogger);
 
-// ─── Global rate limiter ──────────────────────────────────────────────────────
-app.use(globalLimiter);
+// app.use(globalLimiter);
 
-// ─── Health check (unauthenticated, bypasses rate limiter logic) ──────────────
 app.get("/api/v1/health", (_req: Request, res: Response) => {
   res.json({
     success: true,
@@ -50,7 +42,6 @@ app.get("/api/v1/health", (_req: Request, res: Response) => {
   });
 });
 
-// ─── Root ─────────────────────────────────────────────────────────────────────
 app.get("/", (_req: Request, res: Response) => {
   res.json({
     success: true,
@@ -59,7 +50,6 @@ app.get("/", (_req: Request, res: Response) => {
   });
 });
 
-// ─── API v1 routes ────────────────────────────────────────────────────────────
 const v1 = "/api/v1";
 
 app.use(`${v1}/auth`, AuthRoutes);
@@ -71,7 +61,6 @@ app.use(`${v1}/analytics`, AnalyticsRoutes);
 app.use(`${v1}/reports`, ReportsRoutes);
 app.use(`${v1}/settings`, SettingsRoutes);
 
-// ─── Global error handler (must be last) ─────────────────────────────────────
 app.use(globalErrorHandler);
 
 export default app;

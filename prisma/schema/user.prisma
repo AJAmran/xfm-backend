@@ -10,8 +10,7 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  branch        Branch?        @relation(fields: [branchId], references: [id])
-  refreshTokens RefreshToken[]
+  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([email, role])
   @@index([branchId])

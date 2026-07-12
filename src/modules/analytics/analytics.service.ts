@@ -2,16 +2,16 @@ import { Prisma } from "../../../generated/prisma/client";
 import { prisma } from "../../lib/prisma";
 
 export async function getRatingAnalytics(branchId?: number) {
-  const where: Prisma.FeedbackWhereInput = {};
+  const where: Prisma.GuestFeedbackWhereInput = {};
   if (branchId) where.branchId = branchId;
 
   const [ratings, distribution] = await Promise.all([
-    prisma.feedback.aggregate({
+    prisma.guestFeedback.aggregate({
       where,
       _avg: { overallRating: true, foodRating: true, serviceRating: true, environmentRating: true, eventRating: true },
       _count: true,
     }),
-    prisma.feedback.groupBy({
+    prisma.guestFeedback.groupBy({
       by: ["overallRating"],
       where,
       _count: true,
@@ -40,10 +40,10 @@ export async function getBranchPerformance() {
         name: true,
         code: true,
         isActive: true,
-        _count: { select: { feedbacks: true } },
+        _count: { select: { feedback: true } },
       },
     }),
-    prisma.feedback.groupBy({
+    prisma.guestFeedback.groupBy({
       by: ["branchId"],
       _avg: { overallRating: true, foodRating: true, serviceRating: true, environmentRating: true, eventRating: true },
     }),
@@ -57,7 +57,7 @@ export async function getBranchPerformance() {
     name: b.name,
     code: b.code,
     isActive: b.isActive,
-    totalFeedbacks: b._count.feedbacks,
+    totalFeedbacks: b._count.feedback,
     averageRatings: perfMap.get(b.id) ?? null,
   }));
 }
@@ -103,16 +103,16 @@ export async function getMonthlyTrends(branchId?: number) {
 }
 
 export async function getCustomerSatisfaction(branchId?: number) {
-  const where: Prisma.FeedbackWhereInput = {};
+  const where: Prisma.GuestFeedbackWhereInput = {};
   if (branchId) where.branchId = branchId;
 
   const [ratings, negative] = await Promise.all([
-    prisma.feedback.aggregate({
+    prisma.guestFeedback.aggregate({
       where,
       _avg: { overallRating: true },
       _count: true,
     }),
-    prisma.feedback.count({ where: { ...where, overallRating: { lte: 2 } } }),
+    prisma.guestFeedback.count({ where: { ...where, overallRating: { lte: 2 } } }),
   ]);
 
   const total = ratings._count;

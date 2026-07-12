@@ -1,7 +1,7 @@
-model Setting {
+model SystemSetting {
   id        Int      @id @default(autoincrement())
   key       String   @unique
-  value     String   @db.Text
+  value     String
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("system_settings")

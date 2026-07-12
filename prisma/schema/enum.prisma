@@ -2,12 +2,16 @@ enum Role {
   SUPER_ADMIN
   ADMIN
   BRANCH_MANAGER
+
+  @@map("role")
 }
 
 enum HeardAbout {
   SOCIAL_MEDIA
   FRIENDS_AND_FAMILY
   VISITED_BEFORE
+
+  @@map("heard_about")
 }
 
 enum AgeGroup {
@@ -15,4 +19,6 @@ enum AgeGroup {
   AGE_18_30
   AGE_31_50
   AGE_51_PLUS
+
+  @@map("age_group")
 }

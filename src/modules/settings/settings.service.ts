@@ -1,7 +1,7 @@
 import { prisma } from "../../lib/prisma";
 
 export async function getSettings() {
-  const settings = await prisma.setting.findMany();
+  const settings = await prisma.systemSetting.findMany();
   return Object.fromEntries(settings.map((s) => [s.key, s.value]));
 }
 
@@ -12,7 +12,7 @@ export async function getSettings() {
  */
 export async function updateSettings(payload: Record<string, string>) {
   const upserts = Object.entries(payload).map(([key, value]) =>
-    prisma.setting.upsert({
+    prisma.systemSetting.upsert({
       where: { key },
       update: { value },
       create: { key, value },

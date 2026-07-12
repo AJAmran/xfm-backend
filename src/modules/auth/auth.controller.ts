@@ -38,11 +38,9 @@ export async function refreshToken(req: Request, res: Response) {
 }
 
 export async function logout(req: Request, res: Response) {
-  const token = req.cookies?.refreshToken;
-  if (token) {
+  if (req.cookies?.accessToken) {
     res.clearCookie("accessToken", { httpOnly: true, secure: isProduction, sameSite: isProduction ? "none" : "lax" });
     res.clearCookie("refreshToken", { httpOnly: true, secure: isProduction, sameSite: isProduction ? "none" : "lax" });
-    await authService.logoutUser(token);
   }
   successResponse(res, "User logged out successfully", {});
 }

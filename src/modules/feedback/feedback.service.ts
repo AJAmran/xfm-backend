@@ -13,11 +13,11 @@ export async function submitFeedback(payload: CreateFeedbackInput) {
   });
   if (branchCount === 0) throw appError("Branch not found or inactive", httpStatus.NOT_FOUND);
 
-  return prisma.feedback.create({ data: payload });
+  return prisma.guestFeedback.create({ data: payload });
 }
 
 export async function getFeedbackById(id: number) {
-  const feedback = await prisma.feedback.findUnique({
+  const feedback = await prisma.guestFeedback.findUnique({
     where: { id },
     include: { branch: { select: { name: true, code: true } } },
   });
@@ -27,7 +27,7 @@ export async function getFeedbackById(id: number) {
 
 export async function getPaginatedFeedbacks(query: FeedbackQueryInput, branchId?: number) {
   const pagination = transformPagination(query);
-  const where: Prisma.FeedbackWhereInput = {};
+  const where: Prisma.GuestFeedbackWhereInput = {};
 
   // branchId from auth context (BRANCH_MANAGER) takes precedence over query param.
   if (branchId) {
@@ -46,19 +46,19 @@ export async function getPaginatedFeedbacks(query: FeedbackQueryInput, branchId?
   }
 
   if (query.startDate || query.endDate) {
-    const dateFilter: Prisma.DateTimeFilter<"Feedback"> = {};
+    const dateFilter: Prisma.DateTimeFilter<"GuestFeedback"> = {};
     if (query.startDate) dateFilter.gte = new Date(query.startDate);
     if (query.endDate) dateFilter.lte = new Date(query.endDate);
     where.submittedAt = dateFilter;
   }
 
   const [data, total] = await prisma.$transaction([
-    prisma.feedback.findMany({
+    prisma.guestFeedback.findMany({
       where,
       ...pagination,
       include: { branch: { select: { name: true, code: true } } },
     }),
-    prisma.feedback.count({ where }),
+    prisma.guestFeedback.count({ where }),
   ]);
 
   return { data, meta: buildMetadata(total, pagination) };

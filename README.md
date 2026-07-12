@@ -32,7 +32,6 @@ The X-Group Feedback System allows restaurant guests to submit feedback forms (n
 - Role-based dashboard and analytics
 - Excel report export per branch or date range
 - JWT authentication with HttpOnly cookie + Bearer token support
-- Automatic expired token cleanup on login
 
 ---
 
@@ -108,7 +107,6 @@ x-group-feedback-backend/
 │   │   ├── branch.prisma       ← Branch model
 │   │   ├── feedback.prisma     ← Feedback model (with compound indexes)
 │   │   ├── user.prisma         ← User model
-│   │   ├── token.prisma        ← RefreshToken model
 │   │   ├── setting.prisma      ← SystemSetting model
 │   │   └── enum.prisma         ← Role, HeardAbout, AgeGroup enums
 │   ├── migrations/             ← Prisma migration history
@@ -222,8 +220,6 @@ mysql://...?connection_limit=10&pool_timeout=30
 Branch ──────┬── User (branchId FK)
              └── Feedback (branchId FK)
 
-User ─────────── RefreshToken (userId FK, CASCADE DELETE)
-
 Setting (standalone key-value table)
 ```
 
@@ -334,7 +330,7 @@ All endpoints return JSON in this shape:
 |---|---|---|---|---|
 | `POST` | `/auth/login` | ❌ | 10/15min | Login with email + password |
 | `POST` | `/auth/refresh-token` | ❌ | — | Get a new access token via refresh token cookie |
-| `POST` | `/auth/logout` | ❌ | — | Revoke refresh token + clear cookies |
+| `POST` | `/auth/logout` | ❌ | — | Clear cookies |
 | `GET` | `/auth/me` | ✅ All | — | Get current authenticated user |
 
 ---
@@ -477,12 +473,14 @@ POST /auth/refresh-token     ← when access token expires
   → new accessToken
 
 POST /auth/logout
-  → clears cookies, revokes refresh token
+  → clears cookies
 ```
 
 ---
 
 ## Role Permissions Matrix
+
+> **Rule of thumb:** Only `SUPER_ADMIN` and `ADMIN` can **create, update, or delete** any resource. `BRANCH_MANAGER` has read-only access scoped to their own branch.
 
 | Endpoint Group | SUPER_ADMIN | ADMIN | BRANCH_MANAGER |
 |---|---|---|---|
@@ -530,7 +528,7 @@ The global error handler maps all errors to clean HTTP responses:
 | **Pagination limits** | `MAX_LIMIT=100`, `MAX_PAGE=1000` hard caps prevent abuse |
 | **Response compression** | `gzip` compression via `compression` middleware |
 | **Slow query logging** | Queries ≥500ms logged in development mode |
-| **Token auto-cleanup** | Expired refresh tokens deleted atomically on each login |
+
 
 ---
 
@@ -542,7 +540,6 @@ The global error handler maps all errors to clean HTTP responses:
 | Rate limiting | Global: 500/15min; Auth endpoints: 10/15min |
 | Password hashing | `bcrypt` with configurable cost factor (default: 12) |
 | JWT storage | HttpOnly cookies prevent XSS token theft |
-| Token hashing | Refresh tokens stored as SHA-256 hashes — not plaintext |
 | Soft deletes | Users and branches are never hard-deleted |
 | Input validation | Zod schemas on all request inputs (body, query, params) |
 | CORS | Restricted to configured `APP_URL` origin |

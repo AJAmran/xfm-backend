@@ -2,12 +2,12 @@ import { Prisma } from "../../../generated/prisma/client";
 import { prisma } from "../../lib/prisma";
 
 export async function getSummary(branchId?: number) {
-  const where: Prisma.FeedbackWhereInput = {};
+  const where: Prisma.GuestFeedbackWhereInput = {};
   if (branchId) where.branchId = branchId;
 
   const [totalFeedbacks, avg, negative, distribution, recent] = await Promise.all([
-    prisma.feedback.count({ where }),
-    prisma.feedback.aggregate({
+    prisma.guestFeedback.count({ where }),
+    prisma.guestFeedback.aggregate({
       where,
       _avg: {
         overallRating: true,
@@ -17,14 +17,14 @@ export async function getSummary(branchId?: number) {
         eventRating: true,
       },
     }),
-    prisma.feedback.count({ where: { ...where, overallRating: { lte: 2 } } }),
-    prisma.feedback.groupBy({
+    prisma.guestFeedback.count({ where: { ...where, overallRating: { lte: 2 } } }),
+    prisma.guestFeedback.groupBy({
       by: ["overallRating"],
       where,
       _count: true,
       orderBy: { overallRating: "asc" },
     }),
-    prisma.feedback.findMany({
+    prisma.guestFeedback.findMany({
       where,
       orderBy: { submittedAt: "desc" },
       take: 10,
@@ -49,10 +49,10 @@ export async function getSummary(branchId?: number) {
 }
 
 export async function getRecentFeedback(branchId?: number) {
-  const where: Prisma.FeedbackWhereInput = {};
+  const where: Prisma.GuestFeedbackWhereInput = {};
   if (branchId) where.branchId = branchId;
 
-  return prisma.feedback.findMany({
+  return prisma.guestFeedback.findMany({
     where,
     orderBy: { submittedAt: "desc" },
     take: 20,
@@ -79,7 +79,7 @@ export async function getRecentFeedback(branchId?: number) {
  */
 export async function getBranchRanking() {
   const [ranking, branches] = await Promise.all([
-    prisma.feedback.groupBy({
+    prisma.guestFeedback.groupBy({
       by: ["branchId"],
       _avg: {
         overallRating: true,
@@ -108,10 +108,10 @@ export async function getBranchRanking() {
 }
 
 export async function getNegativeFeedback(branchId?: number) {
-  const where: Prisma.FeedbackWhereInput = { overallRating: { lte: 2 } };
+  const where: Prisma.GuestFeedbackWhereInput = { overallRating: { lte: 2 } };
   if (branchId) where.branchId = branchId;
 
-  return prisma.feedback.findMany({
+  return prisma.guestFeedback.findMany({
     where,
     orderBy: { submittedAt: "desc" },
     take: 50,

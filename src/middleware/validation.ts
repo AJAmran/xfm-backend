@@ -12,7 +12,10 @@ export const validateSchema = (target: ValidationTarget) => {
   return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
     try {
       if (target.body) req.body = target.body.parse(req.body);
-      if (target.query) req.query = target.query.parse(req.query) as typeof req.query;
+      if (target.query) {
+        const parsed = target.query.parse(req.query);
+        Object.defineProperty(req, "query", { value: parsed, writable: true, configurable: true });
+      }
       if (target.params) req.params = target.params.parse(req.params) as typeof req.params;
       next();
     } catch (error) {

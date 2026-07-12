@@ -81,10 +81,9 @@ async function main() {
 
   // ── 1. Clear all data (order respects FK constraints) ──────────────────────
   await prisma.$transaction([
-    prisma.refreshToken.deleteMany(),
-    prisma.feedback.deleteMany(),
+    prisma.guestFeedback.deleteMany(),
     prisma.user.deleteMany(),
-    prisma.setting.deleteMany(),
+    prisma.systemSetting.deleteMany(),
   ]);
   // Branches must be deleted after users/feedbacks due to FK constraints.
   await prisma.branch.deleteMany();
@@ -161,7 +160,7 @@ async function main() {
   const FEEDBACK_COUNT = 120; // 8 per branch across 12 templates
   const branchCodes = Array.from(branchMap.keys());
 
-  await prisma.feedback.createMany({
+  await prisma.guestFeedback.createMany({
     data: Array.from({ length: FEEDBACK_COUNT }, (_, i) => {
       const code = branchCodes[i % branchCodes.length];
       const tpl  = FEEDBACK_TEMPLATES[i % FEEDBACK_TEMPLATES.length];
@@ -185,7 +184,7 @@ async function main() {
   console.log(`  ✓ Feedbacks: ${FEEDBACK_COUNT} samples (spread over last 6 months)`);
 
   // ── 5. Default settings ────────────────────────────────────────────────────
-  await prisma.setting.createMany({
+  await prisma.systemSetting.createMany({
     data: [
       { key: "company_name",         value: "X-Group Restaurant" },
       { key: "contact_email",        value: "info@x-grouprestaurant.com" },
@@ -197,10 +196,6 @@ async function main() {
   console.log("  ✓ Settings: defaults created");
 
   console.log("\n✅ Seeding complete.\n");
-  console.log("  Credentials:");
-  console.log("    Super Admin → superadmin@x-grouprestaurant.com / SuperAdmin@123");
-  console.log("    Admin       → admin@x-grouprestaurant.com / Admin@123");
-  console.log("    Managers    → see BRANCH_MANAGERS above\n");
 }
 
 main()

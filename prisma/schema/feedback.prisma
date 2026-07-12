@@ -1,23 +1,23 @@
-model Feedback {
-  id                Int       @id @default(autoincrement())
-  branchId          Int       @map("branch_id")
-  guestName         String    @map("guest_name")
-  contact           String?
-  foodRating        Int       @db.TinyInt @map("food_rating")
-  serviceRating     Int       @db.TinyInt @map("service_rating")
-  environmentRating Int       @db.TinyInt @map("environment_rating")
-  eventRating       Int       @db.TinyInt @map("event_rating")
-  overallRating     Int       @db.TinyInt @map("overall_rating")
-  heardAbout        HeardAbout? @map("heard_about")
-  ageGroup          AgeGroup?   @map("age_group")
-  opinion           String?   @db.Text
-  submittedAt       DateTime  @default(now()) @map("submitted_at")
+model GuestFeedback {
+  id        Int      @id @default(autoincrement())
+  branchId  Int      @map("branch_id")
+  guestName String   @map("guest_name")
+  contact   String
+  foodRating     Int? @map("food_rating")
+  serviceRating  Int? @map("service_rating")
+  environmentRating Int? @map("environment_rating")
+  eventRating     Int? @map("event_rating")
+  overallRating   Int? @map("overall_rating")
+  heardAbout HeardAbout? @map("heard_about")
+  ageGroup   AgeGroup? @map("age_group")
+  opinion    String?
+  submittedAt DateTime @default(now()) @map("submitted_at")
 
-  branch Branch @relation(fields: [branchId], references: [id])
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([branchId])
   @@index([submittedAt])
-  @@index([branchId, submittedAt])   // date-range + branch filter (reports, analytics)
-  @@index([branchId, overallRating]) // negative feedback filter (dashboard)
+  @@index([branchId, submittedAt])
+  @@index([branchId, overallRating])
   @@map("guest_feedbacks")
 }
