@@ -5,7 +5,7 @@ async function getFeedbacksInRange(start: Date, end: Date, branchId?: number) {
   const where: Record<string, unknown> = { submittedAt: { gte: start, lte: end } };
   if (branchId) where.branchId = branchId;
 
-  return prisma.feedback.findMany({
+  return prisma.guestFeedback.findMany({
     where,
     include: { branch: { select: { name: true, code: true } } },
     orderBy: { submittedAt: "desc" },
@@ -17,9 +17,9 @@ async function getPeriodSummary(start: Date, end: Date, branchId?: number) {
   if (branchId) where.branchId = branchId;
 
   const [total, avg, negative] = await Promise.all([
-    prisma.feedback.count({ where }),
-    prisma.feedback.aggregate({ where, _avg: { overallRating: true } }),
-    prisma.feedback.count({ where: { ...where, overallRating: { lte: 2 } } }),
+    prisma.guestFeedback.count({ where }),
+    prisma.guestFeedback.aggregate({ where, _avg: { overallRating: true } }),
+    prisma.guestFeedback.count({ where: { ...where, overallRating: { lte: 2 } } }),
   ]);
 
   return { total, averageRating: avg._avg.overallRating, negativeCount: negative };
@@ -69,10 +69,10 @@ export async function getBranchReport(branchId: number) {
   if (!branch) return null;
 
   const [total, avg, negative, recent] = await Promise.all([
-    prisma.feedback.count({ where: { branchId } }),
-    prisma.feedback.aggregate({ where: { branchId }, _avg: { overallRating: true } }),
-    prisma.feedback.count({ where: { branchId, overallRating: { lte: 2 } } }),
-    prisma.feedback.findMany({ where: { branchId }, orderBy: { submittedAt: "desc" }, take: 20 }),
+    prisma.guestFeedback.count({ where: { branchId } }),
+    prisma.guestFeedback.aggregate({ where: { branchId }, _avg: { overallRating: true } }),
+    prisma.guestFeedback.count({ where: { branchId, overallRating: { lte: 2 } } }),
+    prisma.guestFeedback.findMany({ where: { branchId }, orderBy: { submittedAt: "desc" }, take: 20 }),
   ]);
 
   return { branch, summary: { total, averageRating: avg._avg.overallRating, negativeCount: negative }, recentFeedbacks: recent };
@@ -93,7 +93,7 @@ export async function exportExcel(branchId?: number, startDate?: string, endDate
     where.submittedAt = dateFilter;
   }
 
-  const feedbacks = await prisma.feedback.findMany({
+  const feedbacks = await prisma.guestFeedback.findMany({
     where,
     include: { branch: { select: { name: true, code: true } } },
     orderBy: { submittedAt: "desc" },

@@ -3,6 +3,7 @@ import httpStatus from "http-status";
 import * as userService from "./user.service";
 import { successResponse } from "../../utils/apiResponse";
 import { UserQueryInput } from "./user.validation";
+import { parsedQuery } from "../../middleware/validation";
 
 export async function create(req: Request, res: Response) {
   const user = await userService.createUser(req.body);
@@ -15,7 +16,7 @@ export async function getById(req: Request, res: Response) {
 }
 
 export async function list(req: Request, res: Response) {
-  const query = req.query as unknown as UserQueryInput;
+  const query = parsedQuery<UserQueryInput>(res);
   const result = await userService.getPaginatedUsers(query);
   successResponse(res, "Users retrieved successfully", result);
 }

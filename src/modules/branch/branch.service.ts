@@ -5,14 +5,14 @@ import { appError } from "../../utils/appError";
 import { CreateBranchInput, UpdateBranchInput, BranchQueryInput } from "./branch.validation";
 import { transformPagination, buildMetadata } from "../../utils/queryBuilder";
 
-const formatBranch = (branch: any) => {
+function formatBranch<T extends Record<string, unknown> | null>(branch: T): T {
   if (!branch) return branch;
   return {
     ...branch,
-    ...(branch.latitude !== undefined ? { latitude: Number(branch.latitude) } : {}),
-    ...(branch.longitude !== undefined ? { longitude: Number(branch.longitude) } : {}),
-  };
-};
+    latitude: Number(branch.latitude),
+    longitude: Number(branch.longitude),
+  } as T;
+}
 
 export async function createBranch(payload: CreateBranchInput) {
   const existing = await prisma.branch.findUnique({ where: { code: payload.code } });

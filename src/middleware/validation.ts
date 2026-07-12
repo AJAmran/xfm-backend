@@ -9,14 +9,23 @@ interface ValidationTarget {
 }
 
 export const validateSchema = (target: ValidationTarget) => {
-  return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      if (target.body) req.body = target.body.parse(req.body);
+      if (target.body) {
+        const parsed = target.body.parse(req.body);
+        req.body = parsed;
+        res.locals.validatedBody = parsed;
+      }
       if (target.query) {
         const parsed = target.query.parse(req.query);
         Object.defineProperty(req, "query", { value: parsed, writable: true, configurable: true });
+        res.locals.validatedQuery = parsed;
       }
-      if (target.params) req.params = target.params.parse(req.params) as typeof req.params;
+      if (target.params) {
+        const parsed = target.params.parse(req.params);
+        req.params = parsed as typeof req.params;
+        res.locals.validatedParams = parsed;
+      }
       next();
     } catch (error) {
       if (error instanceof ZodError) {
@@ -30,3 +39,11 @@ export const validateSchema = (target: ValidationTarget) => {
     }
   };
 };
+
+export function parsedQuery<T>(res: Response): T {
+  return res.locals.validatedQuery as T;
+}
+
+export function parsedBody<T>(res: Response): T {
+  return res.locals.validatedBody as T;
+}

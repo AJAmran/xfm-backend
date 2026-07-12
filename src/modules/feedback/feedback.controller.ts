@@ -3,6 +3,7 @@ import httpStatus from "http-status";
 import * as feedbackService from "./feedback.service";
 import { successResponse } from "../../utils/apiResponse";
 import { FeedbackQueryInput } from "./feedback.validation";
+import { parsedQuery } from "../../middleware/validation";
 
 export async function submit(req: Request, res: Response) {
   const feedback = await feedbackService.submitFeedback(req.body);
@@ -15,7 +16,7 @@ export async function getById(req: Request, res: Response) {
 }
 
 export async function list(req: Request, res: Response) {
-  const query = req.query as unknown as FeedbackQueryInput;
+  const query = parsedQuery<FeedbackQueryInput>(res);
   const branchId = req.user?.role === "BRANCH_MANAGER" ? req.user.branchId ?? undefined : undefined;
   const result = await feedbackService.getPaginatedFeedbacks(query, branchId);
   successResponse(res, "Feedbacks retrieved successfully", result);

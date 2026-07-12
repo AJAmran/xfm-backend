@@ -6,7 +6,8 @@ import compression from "compression";
 import env from "./config/env";
 import { requestLogger } from "./middleware/logger";
 import { globalErrorHandler } from "./middleware/errorHandler";
-import { globalLimiter } from "./middleware/rateLimiter";
+// import { globalLimiter } from "./middleware/rateLimiter";
+import { prisma } from "./lib/prisma";
 import { AuthRoutes } from "./modules/auth/auth.route";
 import { UserRoutes } from "./modules/user/user.routes";
 import { BranchRoutes } from "./modules/branch/branch.routes";
@@ -32,13 +33,24 @@ app.use(requestLogger);
 
 // app.use(globalLimiter);
 
-app.get("/api/v1/health", (_req: Request, res: Response) => {
-  res.json({
-    success: true,
-    status: "ok",
+app.get("/api/v1/health", async (_req: Request, res: Response) => {
+  let dbStatus = "unhealthy";
+  try {
+    await prisma.$queryRaw<unknown[]>`SELECT 1`;
+    dbStatus = "healthy";
+  } catch {
+    dbStatus = "unhealthy";
+  }
+
+  const statusCode = dbStatus === "healthy" ? 200 : 503;
+
+  res.status(statusCode).json({
+    success: dbStatus === "healthy",
+    status: statusCode === 200 ? "ok" : "degraded",
     uptime: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
     version: "v1",
+    database: dbStatus,
   });
 });
 

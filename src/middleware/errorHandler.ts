@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { Prisma } from "../../generated/prisma/client";
 import { errorResponse } from "../utils/apiResponse";
+import { logger } from "../lib/logger";
 import env from "../config/env";
 
 /**
@@ -44,7 +45,7 @@ export const globalErrorHandler = (
         errorResponse(res, "Operation failed: a related record does not exist.", [], 400);
         return;
       default:
-        console.error(`[Prisma Error] Code: ${err.code}`, err.message);
+        logger.error({ prismaCode: err.code, message: err.message }, "prisma error");
         errorResponse(res, "A database error occurred.", [], 500);
         return;
     }
@@ -52,13 +53,13 @@ export const globalErrorHandler = (
 
   // 3. Prisma validation errors (bad query shape — should not reach prod)
   if (err instanceof Prisma.PrismaClientValidationError) {
-    console.error("[Prisma Validation Error]", err.message);
+    logger.error({ message: err.message }, "prisma validation error");
     errorResponse(res, "Invalid database query.", [], 400);
     return;
   }
 
   // 4. Unhandled / unexpected errors
-  console.error("[Critical Error]", err);
+  logger.error({ err }, "unhandled error");
   errorResponse(
     res,
     env.node_env === "production" ? "An unexpected error occurred." : err.message,

@@ -3,6 +3,7 @@ import httpStatus from "http-status";
 import * as branchService from "./branch.service";
 import { successResponse } from "../../utils/apiResponse";
 import { BranchQueryInput } from "./branch.validation";
+import { parsedQuery } from "../../middleware/validation";
 
 export async function create(req: Request, res: Response) {
   const branch = await branchService.createBranch(req.body);
@@ -15,7 +16,7 @@ export async function getById(req: Request, res: Response) {
 }
 
 export async function list(req: Request, res: Response) {
-  const query = req.query as unknown as BranchQueryInput;
+  const query = parsedQuery<BranchQueryInput>(res);
   const result = await branchService.getPaginatedBranches(query);
   successResponse(res, "Branches retrieved successfully", result);
 }

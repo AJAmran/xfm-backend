@@ -1,28 +1,35 @@
 import app from "./app";
 import env from "./config/env";
 import { prisma } from "./lib/prisma";
+import { logger } from "./lib/logger";
 
 async function main() {
   try {
     await prisma.$connect();
-    console.log("Database connected successfully");
+    logger.info("database connected successfully");
 
     const server = app.listen(env.port, () => {
-      console.log(`Server running on port ${env.port} [${env.node_env}]`);
+      logger.info({ port: env.port, nodeEnv: env.node_env }, "server started");
     });
 
     const shutdown = async (signal: string) => {
-      console.log(`\n${signal} received. Shutting down gracefully...`);
+      logger.info({ signal }, "shutting down gracefully");
+
+      const forcedExit = setTimeout(() => {
+        logger.error("forced shutdown after timeout");
+        process.exit(1);
+      }, 30_000).unref();
+
       server.close(async () => {
+        clearTimeout(forcedExit);
         await prisma.$disconnect();
-        process.exit(0);
       });
     };
 
     process.on("SIGINT", () => shutdown("SIGINT"));
     process.on("SIGTERM", () => shutdown("SIGTERM"));
   } catch (error) {
-    console.error("Failed to start server:", error);
+    logger.error({ err: error }, "failed to start server");
     await prisma.$disconnect();
     process.exit(1);
   }

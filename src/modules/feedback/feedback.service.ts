@@ -13,7 +13,12 @@ export async function submitFeedback(payload: CreateFeedbackInput) {
   });
   if (branchCount === 0) throw appError("Branch not found or inactive", httpStatus.NOT_FOUND);
 
-  return prisma.guestFeedback.create({ data: payload });
+  return prisma.guestFeedback.create({ 
+    data: {
+      ...payload,
+      contact: payload.contact ?? "",
+    },
+  });
 }
 
 export async function getFeedbackById(id: number) {
