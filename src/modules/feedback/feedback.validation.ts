@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { HeardAbout, AgeGroup } from "../../../generated/prisma/enums";
 
-const rating = z.number().int().min(3).max(5);
+const rating = z.number().int().min(1).max(5);
 
 export const createFeedbackSchema = z.object({
   branchId: z.number().int().positive(),
