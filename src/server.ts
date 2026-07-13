@@ -35,6 +35,15 @@ async function main() {
   }
 }
 
+process.on("unhandledRejection", (reason) => {
+  logger.error({ err: reason }, "unhandled promise rejection");
+});
+
+process.on("uncaughtException", (error) => {
+  logger.error({ err: error }, "uncaught exception");
+  process.exit(1);
+});
+
 if (!process.env.VERCEL) {
   main();
 }

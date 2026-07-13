@@ -1,6 +1,6 @@
 import { Role, HeardAbout, AgeGroup } from "../generated/prisma/enums";
 import "dotenv/config";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import { PrismaClient } from "../generated/prisma/client";
 

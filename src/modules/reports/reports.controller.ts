@@ -1,3 +1,4 @@
+import httpStatus from "http-status";
 import { Request, Response } from "express";
 import * as reportsService from "./reports.service";
 import { successResponse } from "../../utils/apiResponse";
@@ -41,5 +42,8 @@ export async function exportExcel(req: Request, res: Response) {
 }
 
 export async function exportPdf(_req: Request, res: Response) {
-  successResponse(res, "PDF export will be available in a future update", {});
+  res.status(httpStatus.NOT_IMPLEMENTED).json({
+    success: false,
+    message: "PDF export is not yet implemented",
+  });
 }

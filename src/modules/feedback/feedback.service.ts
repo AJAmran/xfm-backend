@@ -6,19 +6,19 @@ import { CreateFeedbackInput, FeedbackQueryInput } from "./feedback.validation";
 import { transformPagination, buildMetadata } from "../../utils/queryBuilder";
 
 export async function submitFeedback(payload: CreateFeedbackInput) {
-  // Validate the branch exists using count — cheaper than findUnique for
-  // a pure existence check (no row data is needed).
-  const branchCount = await prisma.branch.count({
-    where: { id: payload.branchId, isActive: true, isDeleted: false },
-  });
-  if (branchCount === 0) throw appError("Branch not found or inactive", httpStatus.NOT_FOUND);
-
-  return prisma.guestFeedback.create({ 
-    data: {
-      ...payload,
-      contact: payload.contact ?? "",
-    },
-  });
+  try {
+    return await prisma.guestFeedback.create({
+      data: {
+        ...payload,
+        contact: payload.contact ?? "",
+      },
+    });
+  } catch (error: any) {
+    if (error.code === "P2003") {
+      throw appError("Branch not found or inactive", httpStatus.NOT_FOUND);
+    }
+    throw error;
+  }
 }
 
 export async function getFeedbackById(id: number) {

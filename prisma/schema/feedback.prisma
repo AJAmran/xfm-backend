@@ -17,7 +17,9 @@ model GuestFeedback {
 
   @@index([branchId])
   @@index([submittedAt])
+  @@index([overallRating])
   @@index([branchId, submittedAt])
   @@index([branchId, overallRating])
+  @@index([overallRating, submittedAt])
   @@map("guest_feedbacks")
 }

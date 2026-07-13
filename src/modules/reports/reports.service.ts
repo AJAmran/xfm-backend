@@ -1,19 +1,24 @@
 import ExcelJS from "exceljs";
+import httpStatus from "http-status";
+import { Prisma } from "../../../generated/prisma/client";
 import { prisma } from "../../lib/prisma";
+import { appError } from "../../utils/appError";
+import env from "../../config/env";
 
 async function getFeedbacksInRange(start: Date, end: Date, branchId?: number) {
-  const where: Record<string, unknown> = { submittedAt: { gte: start, lte: end } };
+  const where: Prisma.GuestFeedbackWhereInput = { submittedAt: { gte: start, lte: end } };
   if (branchId) where.branchId = branchId;
 
   return prisma.guestFeedback.findMany({
     where,
     include: { branch: { select: { name: true, code: true } } },
     orderBy: { submittedAt: "desc" },
+    take: env.report_fetch_limit,
   });
 }
 
 async function getPeriodSummary(start: Date, end: Date, branchId?: number) {
-  const where: Record<string, unknown> = { submittedAt: { gte: start, lte: end } };
+  const where: Prisma.GuestFeedbackWhereInput = { submittedAt: { gte: start, lte: end } };
   if (branchId) where.branchId = branchId;
 
   const [total, avg, negative] = await Promise.all([
@@ -66,7 +71,7 @@ export async function getMonthlyReport(branchId?: number) {
 
 export async function getBranchReport(branchId: number) {
   const branch = await prisma.branch.findUnique({ where: { id: branchId, isDeleted: false } });
-  if (!branch) return null;
+  if (!branch) throw appError("Branch not found", httpStatus.NOT_FOUND);
 
   const [total, avg, negative, recent] = await Promise.all([
     prisma.guestFeedback.count({ where: { branchId } }),
@@ -79,11 +84,11 @@ export async function getBranchReport(branchId: number) {
 }
 
 export async function exportExcel(branchId?: number, startDate?: string, endDate?: string) {
-  const where: Record<string, unknown> = {};
+  const where: Prisma.GuestFeedbackWhereInput = {};
   if (branchId) where.branchId = branchId;
 
   if (startDate || endDate) {
-    const dateFilter: Record<string, Date> = {};
+    const dateFilter: Prisma.DateTimeFilter<"GuestFeedback"> = {};
     if (startDate) dateFilter.gte = new Date(startDate);
     if (endDate) {
       const end = new Date(endDate);
@@ -97,7 +102,7 @@ export async function exportExcel(branchId?: number, startDate?: string, endDate
     where,
     include: { branch: { select: { name: true, code: true } } },
     orderBy: { submittedAt: "desc" },
-    take: 10000,
+    take: env.report_export_limit,
   });
 
   const workbook = new ExcelJS.Workbook();

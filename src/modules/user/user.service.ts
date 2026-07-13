@@ -1,4 +1,4 @@
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import httpStatus from "http-status";
 import { Prisma } from "../../../generated/prisma/client";
 import { appError } from "../../utils/appError";

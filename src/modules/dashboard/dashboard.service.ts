@@ -1,29 +1,13 @@
 import { Prisma } from "../../../generated/prisma/client";
 import { prisma } from "../../lib/prisma";
+import { buildFeedbackWhere, getRatingStats, getNegativeCount } from "../../utils/feedbackAggregation";
 
-export async function getSummary(branchId?: number) {
-  const where: Prisma.GuestFeedbackWhereInput = {};
-  if (branchId) where.branchId = branchId;
+export async function getSummary(branchId?: number, startDate?: string, endDate?: string) {
+  const params = { branchId, startDate, endDate };
+  const where = buildFeedbackWhere(params);
 
-  const [totalFeedbacks, avg, negative, distribution, recent] = await Promise.all([
-    prisma.guestFeedback.count({ where }),
-    prisma.guestFeedback.aggregate({
-      where,
-      _avg: {
-        overallRating: true,
-        foodRating: true,
-        serviceRating: true,
-        environmentRating: true,
-        eventRating: true,
-      },
-    }),
-    prisma.guestFeedback.count({ where: { ...where, overallRating: { lte: 2 } } }),
-    prisma.guestFeedback.groupBy({
-      by: ["overallRating"],
-      where,
-      _count: true,
-      orderBy: { overallRating: "asc" },
-    }),
+  const [stats, recent] = await Promise.all([
+    getRatingStats(params),
     prisma.guestFeedback.findMany({
       where,
       orderBy: { submittedAt: "desc" },
@@ -40,17 +24,16 @@ export async function getSummary(branchId?: number) {
   ]);
 
   return {
-    totalFeedbacks,
-    averageRatings: avg._avg,
-    negativeFeedbackCount: negative,
-    ratingDistribution: distribution.map((d) => ({ rating: d.overallRating, count: d._count })),
+    totalFeedbacks: stats.totalFeedbacks,
+    averageRatings: stats.averages,
+    negativeFeedbackCount: getNegativeCount(stats.distribution),
+    ratingDistribution: stats.distribution,
     recentFeedbacks: recent,
   };
 }
 
-export async function getRecentFeedback(branchId?: number) {
-  const where: Prisma.GuestFeedbackWhereInput = {};
-  if (branchId) where.branchId = branchId;
+export async function getRecentFeedback(branchId?: number, startDate?: string, endDate?: string) {
+  const where = buildFeedbackWhere({ branchId, startDate, endDate });
 
   return prisma.guestFeedback.findMany({
     where,
@@ -72,15 +55,13 @@ export async function getRecentFeedback(branchId?: number) {
   });
 }
 
-/**
- * Returns branch ranking with names resolved in a single parallel fetch.
- * groupBy does not support include, so branch names are joined via a Map
- * from a concurrent branches query — no N+1.
- */
-export async function getBranchRanking() {
+export async function getBranchRanking(startDate?: string, endDate?: string) {
+  const where = buildFeedbackWhere({ startDate, endDate });
+
   const [ranking, branches] = await Promise.all([
     prisma.guestFeedback.groupBy({
       by: ["branchId"],
+      where,
       _avg: {
         overallRating: true,
         foodRating: true,
@@ -107,9 +88,19 @@ export async function getBranchRanking() {
   }));
 }
 
-export async function getNegativeFeedback(branchId?: number) {
+export async function getNegativeFeedback(branchId?: number, startDate?: string, endDate?: string) {
   const where: Prisma.GuestFeedbackWhereInput = { overallRating: { lte: 2 } };
   if (branchId) where.branchId = branchId;
+  if (startDate || endDate) {
+    const dateFilter: Prisma.DateTimeFilter<"GuestFeedback"> = {};
+    if (startDate) dateFilter.gte = new Date(startDate);
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.lte = end;
+    }
+    where.submittedAt = dateFilter;
+  }
 
   return prisma.guestFeedback.findMany({
     where,

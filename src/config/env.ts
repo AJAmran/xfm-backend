@@ -14,6 +14,8 @@ const envSchema = z.object({
   JWT_REFRESH_EXPIRES_IN: z.string().default("7d"),
   SALT_ROUNDS: z.coerce.number().positive().default(12),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  REPORT_EXPORT_LIMIT: z.coerce.number().positive().default(5000),
+  REPORT_FETCH_LIMIT: z.coerce.number().positive().default(1000),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -35,4 +37,6 @@ export default {
   jwt_refresh_expires_in: env.JWT_REFRESH_EXPIRES_IN,
   salt_rounds: env.SALT_ROUNDS,
   node_env: env.NODE_ENV,
+  report_export_limit: env.REPORT_EXPORT_LIMIT,
+  report_fetch_limit: env.REPORT_FETCH_LIMIT,
 };

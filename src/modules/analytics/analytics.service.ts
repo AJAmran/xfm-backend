@@ -1,37 +1,25 @@
 import { Prisma } from "../../../generated/prisma/client";
 import { prisma } from "../../lib/prisma";
+import { buildFeedbackWhere, getRatingStats, getSatisfactionMetrics } from "../../utils/feedbackAggregation";
 
-export async function getRatingAnalytics(branchId?: number) {
-  const where: Prisma.GuestFeedbackWhereInput = {};
-  if (branchId) where.branchId = branchId;
+export async function getRatingAnalytics(branchId?: number, startDate?: string, endDate?: string) {
+  const params = { branchId, startDate, endDate };
+  const stats = await getRatingStats(params);
 
-  const [ratings, distribution] = await Promise.all([
-    prisma.guestFeedback.aggregate({
-      where,
-      _avg: { overallRating: true, foodRating: true, serviceRating: true, environmentRating: true, eventRating: true },
-      _count: true,
-    }),
-    prisma.guestFeedback.groupBy({
-      by: ["overallRating"],
-      where,
-      _count: true,
-      orderBy: { overallRating: "asc" },
-    }),
-  ]);
-
-  const total = ratings._count;
   return {
-    averages: ratings._avg,
-    totalFeedbacks: total,
-    distribution: distribution.map((d) => ({
-      rating: d.overallRating,
-      count: d._count,
-      percentage: total ? Math.round((d._count / total) * 100) : 0,
+    averages: stats.averages,
+    totalFeedbacks: stats.totalFeedbacks,
+    distribution: stats.distribution.map((d) => ({
+      rating: d.rating,
+      count: d.count,
+      percentage: stats.totalFeedbacks ? Math.round((d.count / stats.totalFeedbacks) * 100) : 0,
     })),
   };
 }
 
-export async function getBranchPerformance() {
+export async function getBranchPerformance(startDate?: string, endDate?: string) {
+  const where = buildFeedbackWhere({ startDate, endDate });
+
   const [branches, performance] = await Promise.all([
     prisma.branch.findMany({
       where: { isDeleted: false },
@@ -40,16 +28,16 @@ export async function getBranchPerformance() {
         name: true,
         code: true,
         isActive: true,
-        _count: { select: { feedback: true } },
+        _count: { select: { feedback: { where } } },
       },
     }),
     prisma.guestFeedback.groupBy({
       by: ["branchId"],
+      where,
       _avg: { overallRating: true, foodRating: true, serviceRating: true, environmentRating: true, eventRating: true },
     }),
   ]);
 
-  // Build a Map for O(1) lookup instead of O(n) Array.find per branch.
   const perfMap = new Map(performance.map((p) => [p.branchId, p._avg]));
 
   return branches.map((b) => ({
@@ -62,19 +50,15 @@ export async function getBranchPerformance() {
   }));
 }
 
-/**
- * Returns monthly feedback trends using database-side aggregation.
- *
- * Instead of loading all rows into Node.js memory (which is O(N) in data
- * size), this uses a raw SQL GROUP BY with DATE_FORMAT to aggregate on the
- * MariaDB/MySQL side — returning only one row per month.
- *
- * Reference: https://www.prisma.io/docs/orm/prisma-client/using-raw-sql/raw-queries
- */
-export async function getMonthlyTrends(branchId?: number) {
-  // Build the WHERE clause dynamically for raw SQL.
+export async function getMonthlyTrends(branchId?: number, startDate?: string, endDate?: string) {
   const conditions: Prisma.Sql[] = [];
   if (branchId) conditions.push(Prisma.sql`branch_id = ${branchId}`);
+  if (startDate) conditions.push(Prisma.sql`submitted_at >= ${new Date(startDate)}`);
+  if (endDate) {
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    conditions.push(Prisma.sql`submitted_at <= ${end}`);
+  }
 
   const whereClause =
     conditions.length > 0
@@ -94,7 +78,6 @@ export async function getMonthlyTrends(branchId?: number) {
     ORDER BY month ASC
   `;
 
-  // BigInt from COUNT(*) must be serialized to Number for JSON output.
   return rows.map((r) => ({
     month: r.month,
     averageRating: Number(r.average_rating),
@@ -102,27 +85,6 @@ export async function getMonthlyTrends(branchId?: number) {
   }));
 }
 
-export async function getCustomerSatisfaction(branchId?: number) {
-  const where: Prisma.GuestFeedbackWhereInput = {};
-  if (branchId) where.branchId = branchId;
-
-  const [ratings, negative] = await Promise.all([
-    prisma.guestFeedback.aggregate({
-      where,
-      _avg: { overallRating: true },
-      _count: true,
-    }),
-    prisma.guestFeedback.count({ where: { ...where, overallRating: { lte: 2 } } }),
-  ]);
-
-  const total = ratings._count;
-  const satisfactionRate = total ? Math.round(((total - negative) / total) * 100) : 0;
-
-  return {
-    satisfactionRate,
-    totalFeedbacks: total,
-    averageRating: ratings._avg.overallRating,
-    negativeFeedbackCount: negative,
-    category: satisfactionRate >= 80 ? "Excellent" : satisfactionRate >= 60 ? "Good" : "Needs Improvement",
-  };
+export async function getCustomerSatisfaction(branchId?: number, startDate?: string, endDate?: string) {
+  return getSatisfactionMetrics({ branchId, startDate, endDate });
 }
