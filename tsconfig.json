@@ -1,20 +1,20 @@
 {
-"compilerOptions": {
-"outDir": "./dist",
-"module": "CommonJS",
-"target": "ES2023",
-"types": ["node"],
-"sourceMap": true,
-"declaration": true,
-"declarationMap": true,
-"noUncheckedIndexedAccess": true,
-"strict": true,
-"isolatedModules": true,
-"noUncheckedSideEffectImports": true,
-"moduleDetection": "force",
-"skipLibCheck": true,
-"esModuleInterop": true
-},
-// "include": ["src/**/"],
-"exclude": ["node_modules", "dist"]
+  "compilerOptions": {
+    "outDir": "./dist",
+    "module": "CommonJS",
+    "target": "ES2023",
+    "types": ["node"],
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+    "noUncheckedIndexedAccess": true,
+    "strict": true,
+    "isolatedModules": true,
+    "noUncheckedSideEffectImports": true,
+    "moduleDetection": "force",
+    "skipLibCheck": true,
+    "esModuleInterop": true
+  },
+  "include": ["src/**/*", "prisma/**/*.ts", "prisma.config.ts", "test-connection.ts"],
+  "exclude": ["node_modules", "dist"]
 }

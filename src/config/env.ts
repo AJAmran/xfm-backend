@@ -7,6 +7,13 @@ dotenv.config({ path: path.join(process.cwd(), ".env") });
 const envSchema = z.object({
   PORT: z.coerce.number().positive().default(5000),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
+  // Optional manual override for SSL. Leave unset to auto-detect from
+  // DATABASE_URL's `ssl-mode=REQUIRED` param (e.g. Aiven). Set explicitly
+  // to "true"/"false" if a host needs it forced one way or the other
+  // (e.g. shared hosting with no SSL support, or a host missing the query param).
+  DATABASE_SSL: z
+    .enum(["true", "false"])
+    .optional(),
   APP_URL: z.string().default("http://localhost:3000"),
   JWT_ACCESS_SECRET: z.string().min(1, "JWT_ACCESS_SECRET is required"),
   JWT_REFRESH_SECRET: z.string().min(1, "JWT_REFRESH_SECRET is required"),
@@ -30,6 +37,8 @@ const env = parsed.data;
 export default {
   port: env.PORT,
   database_url: env.DATABASE_URL,
+  // undefined when unset, so prisma.ts can fall back to auto-detection
+  database_ssl: env.DATABASE_SSL,
   app_url: env.APP_URL,
   jwt_access_secret: env.JWT_ACCESS_SECRET,
   jwt_refresh_secret: env.JWT_REFRESH_SECRET,
