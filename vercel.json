@@ -1,14 +1,14 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "installCommand": "npm install",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/api" }
+    {
+      "source": "/(.*)",
+      "destination": "/api"
+    }
   ],
   "functions": {
-    "api/**/*.ts": {
-      "maxDuration": 30
+    "api/**/*": {
+      "includeFiles": "generated/prisma/**"
     }
   }
 }

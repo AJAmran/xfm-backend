@@ -5,9 +5,10 @@
   "main": "dist/src/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "start": "node dist/src/server.js",
-    "build": "rimraf dist && tsc",
-    "postinstall": "prisma generate"
+    "start": "node dist/server.js",
+    "build": "tsup src/server.ts --format cjs --clean",
+    "postinstall": "prisma generate",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
