@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import httpStatus from "http-status";
-import { Prisma } from "../../../generated/prisma/client";
+import { Prisma, Role } from "../../../generated/prisma/client";
 import { appError } from "../../utils/appError";
 import * as userRepo from "./user.repository";
 import { CreateUserInput, UpdateUserInput, UserQueryInput } from "./user.validation";
@@ -43,6 +43,9 @@ export async function getPaginatedUsers(query: UserQueryInput) {
 export async function updateUser(id: number, payload: UpdateUserInput) {
   const existing = await userRepo.findUserById(id);
   if (!existing) throw appError("User not found", httpStatus.NOT_FOUND);
+  if (existing.role === Role.SUPER_ADMIN) {
+    throw appError("Super Admin accounts cannot be modified", httpStatus.FORBIDDEN);
+  }
 
   if (payload.email && payload.email !== existing.email) {
     const dup = await userRepo.findUserByEmail(payload.email);
@@ -63,6 +66,11 @@ export async function updateUser(id: number, payload: UpdateUserInput) {
  * Relies on the global error handler to catch P2025 (record not found).
  */
 export async function deleteUser(id: number) {
+  const existing = await userRepo.findUserById(id);
+  if (!existing) throw appError("User not found", httpStatus.NOT_FOUND);
+  if (existing.role === Role.SUPER_ADMIN) {
+    throw appError("Super Admin accounts cannot be deleted", httpStatus.FORBIDDEN);
+  }
   await userRepo.softDeleteUser(id);
 }
 
@@ -71,6 +79,11 @@ export async function deleteUser(id: number) {
  * Relies on the global error handler to catch P2025 (record not found).
  */
 export async function setUserStatus(id: number, isActive: boolean) {
+  const existing = await userRepo.findUserById(id);
+  if (!existing) throw appError("User not found", httpStatus.NOT_FOUND);
+  if (existing.role === Role.SUPER_ADMIN) {
+    throw appError("Super Admin accounts cannot be modified", httpStatus.FORBIDDEN);
+  }
   const user = await userRepo.updateUserStatus(id, isActive);
   return omitPassword(user);
 }

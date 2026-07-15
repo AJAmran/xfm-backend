@@ -381,6 +381,30 @@ const FEEDBACK_TEMPLATES = [
     ageGroup: AgeGroup.AGE_51_PLUS,
     opinion: "Staff is always welcoming and professional.",
   },
+  {
+    guestName: "Shahidul Alam",
+    contact: "01833330003",
+    foodRating: 2,
+    serviceRating: 3,
+    environmentRating: 2,
+    eventRating: 3,
+    overallRating: 2,
+    heardAbout: HeardAbout.SOCIAL_MEDIA,
+    ageGroup: AgeGroup.AGE_31_50,
+    opinion: "Very disappointed with the food quality today.",
+  },
+  {
+    guestName: "Roksana Begum",
+    contact: "01844440004",
+    foodRating: 1,
+    serviceRating: 2,
+    environmentRating: 3,
+    eventRating: 1,
+    overallRating: 1,
+    heardAbout: HeardAbout.FRIENDS_AND_FAMILY,
+    ageGroup: AgeGroup.AGE_51_PLUS,
+    opinion: "Worst experience ever. Will not recommend to anyone.",
+  },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

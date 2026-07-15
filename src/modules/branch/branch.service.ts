@@ -84,8 +84,9 @@ export async function setBranchStatus(id: number, isActive: boolean) {
 }
 
 export async function getAllActiveBranches() {
-  return prisma.branch.findMany({
+  const branches = await prisma.branch.findMany({
     where: { isActive: true, isDeleted: false },
-    select: { id: true, name: true, code: true, address: true, phone: true },
+    select: { id: true, name: true, code: true, address: true, phone: true, latitude: true, longitude: true },
   });
+  return branches.map(formatBranch);
 }
