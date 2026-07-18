@@ -21,7 +21,19 @@ const app: Application = express();
 
 app.use(helmet());
 
-app.use(cors({ origin: env.app_url, credentials: true }));
+const allowedOrigins = env.app_url.split(",").map((url) => url.trim().replace(/\/$/, ""));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  })
+);
 
 app.use(cookieParser());
 app.use(express.json({ limit: "10kb" }));
