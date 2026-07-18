@@ -105,3 +105,110 @@ export async function getCustomerSatisfaction(branchId?: number, startDate?: str
     return getSatisfactionMetrics({ branchId, startDate, endDate });
   }, 300);
 }
+
+export async function getDashboardSummary(branchId?: number, startDate?: string, endDate?: string) {
+  const cacheKey = `dashboard_summary_${branchId || "all"}_${startDate || "none"}_${endDate || "none"}`;
+
+  return withCache(cacheKey, async () => {
+    const params = { branchId, startDate, endDate };
+
+    // 1. Get rating stats (which includes averages, distribution, and total count)
+    const stats = await getRatingStats(params);
+
+    // 2. Compute sentiment from distribution
+    let positive = 0;
+    let neutral = 0;
+    let negative = 0;
+    stats.distribution.forEach(d => {
+      if (d.rating !== null) {
+        if (d.rating >= 4) positive += d.count;
+        else if (d.rating === 3) neutral += d.count;
+        else if (d.rating <= 2) negative += d.count;
+      }
+    });
+
+    // 3. Get monthly trends
+    const trend = await getMonthlyTrends(branchId, startDate, endDate);
+
+    // 4. Get branch performance (only if no specific branchId is provided, otherwise just get that branch)
+    const branchComparison = await getBranchPerformance(startDate, endDate);
+    const filteredBranches = branchId ? branchComparison.filter(b => b.id === branchId) : branchComparison;
+
+    // 5. Daily volume for the last 14 days
+    const conditions: Prisma.Sql[] = [];
+    if (branchId) conditions.push(Prisma.sql`branch_id = ${branchId}`);
+    
+    // Default to last 14 days if no startDate
+    const start = startDate ? new Date(startDate) : new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+    conditions.push(Prisma.sql`submitted_at >= ${start}`);
+    
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      conditions.push(Prisma.sql`submitted_at <= ${end}`);
+    }
+
+    const whereClause = conditions.length > 0
+      ? Prisma.sql`WHERE ${Prisma.join(conditions, " AND ")}`
+      : Prisma.empty;
+
+    const dailyRows = await prisma.$queryRaw<
+      { date: string; count: bigint }[]
+    >`
+      SELECT
+        DATE_FORMAT(submitted_at, '%b %d') AS date,
+        COUNT(*)                           AS count
+      FROM guest_feedbacks
+      ${whereClause}
+      GROUP BY date
+      ORDER BY MIN(submitted_at) ASC
+    `;
+
+    const daily = dailyRows.map(r => ({
+      date: r.date,
+      count: Number(r.count)
+    }));
+
+    // 6. This week and this month counts
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+
+    const [thisWeekCount, thisMonthCount] = await Promise.all([
+      prisma.guestFeedback.count({
+        where: { branchId, submittedAt: { gte: startOfWeek } }
+      }),
+      prisma.guestFeedback.count({
+        where: { branchId, submittedAt: { gte: startOfMonth } }
+      })
+    ]);
+
+    return {
+      totalFeedbacks: stats.totalFeedbacks,
+      averageRating: stats.averages.overallRating,
+      averages: stats.averages,
+      distribution: stats.distribution,
+      sentiment: { positive, neutral, negative, total: stats.totalFeedbacks },
+      trend,
+      branchComparison: {
+        companyAvg: stats.averages.overallRating,
+        branches: filteredBranches.map(b => ({
+          code: (b.code ?? b.name).substring(0, 8),
+          average: b.averageRatings?.overallRating ?? 0
+        }))
+      },
+      branchReports: filteredBranches.map(b => {
+         const avg = b.averageRatings?.overallRating ?? 0;
+         return {
+           branchName: b.name,
+           totalFeedback: b.totalFeedbacks,
+           averageRating: parseFloat(avg.toFixed(1)),
+         };
+      }),
+      daily,
+      thisWeek: thisWeekCount,
+      thisMonth: thisMonthCount
+    };
+  }, 300);
+}

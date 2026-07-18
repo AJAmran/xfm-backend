@@ -30,3 +30,10 @@ export async function satisfaction(req: Request, res: Response) {
   const data = await analyticsService.getCustomerSatisfaction(branchId, query.startDate, query.endDate);
   successResponse(res, "Customer satisfaction retrieved successfully", data);
 }
+
+export async function dashboardSummary(req: Request, res: Response) {
+  const query = parsedQuery<AnalyticsQueryInput>(res);
+  const branchId = req.user?.role === "BRANCH_MANAGER" ? req.user.branchId ?? undefined : undefined;
+  const data = await analyticsService.getDashboardSummary(branchId, query.startDate, query.endDate);
+  successResponse(res, "Dashboard summary retrieved successfully", data);
+}

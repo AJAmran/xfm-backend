@@ -13,5 +13,6 @@ router.get("/ratings", validateSchema({ query: analyticsQuerySchema }), analytic
 router.get("/branches", authGuard(Role.SUPER_ADMIN, Role.ADMIN), analyticsController.branches);
 router.get("/monthly", validateSchema({ query: analyticsQuerySchema }), analyticsController.monthly);
 router.get("/satisfaction", validateSchema({ query: analyticsQuerySchema }), analyticsController.satisfaction);
+router.get("/dashboard", validateSchema({ query: analyticsQuerySchema }), analyticsController.dashboardSummary);
 
 export { router as AnalyticsRoutes };
