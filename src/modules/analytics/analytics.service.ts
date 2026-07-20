@@ -116,16 +116,17 @@ export async function getDashboardSummary(branchId?: number, startDate?: string,
     const stats = await getRatingStats(params);
 
     // 2. Compute sentiment from distribution
+    // Excellent(5)/Good(4) → Positive, Average(3) → Neutral, Poor(2) → Negative
     let positive = 0;
     let neutral = 0;
     let negative = 0;
-    stats.distribution.forEach(d => {
+    for (const d of stats.distribution) {
       if (d.rating !== null) {
         if (d.rating >= 4) positive += d.count;
         else if (d.rating === 3) neutral += d.count;
-        else if (d.rating <= 2) negative += d.count;
+        else negative += d.count;
       }
-    });
+    }
 
     // 3. Get monthly trends
     const trend = await getMonthlyTrends(branchId, startDate, endDate);
@@ -175,12 +176,13 @@ export async function getDashboardSummary(branchId?: number, startDate?: string,
     const startOfWeek = new Date(now);
     startOfWeek.setDate(now.getDate() - now.getDay());
 
+    const branchWhere = branchId ? { branchId } : {};
     const [thisWeekCount, thisMonthCount] = await Promise.all([
       prisma.guestFeedback.count({
-        where: { branchId, submittedAt: { gte: startOfWeek } }
+        where: { ...branchWhere, submittedAt: { gte: startOfWeek } }
       }),
       prisma.guestFeedback.count({
-        where: { branchId, submittedAt: { gte: startOfMonth } }
+        where: { ...branchWhere, submittedAt: { gte: startOfMonth } }
       })
     ]);
 
