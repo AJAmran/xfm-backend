@@ -5,6 +5,7 @@ const rating = z.number().int().min(1).max(5);
 
 export const createFeedbackSchema = z.object({
   branchId: z.number().int().positive(),
+  feedbackId: z.string().trim().optional(),
   guestName: z.string().trim().min(1),
   contact: z.string().trim(),
   foodRating: rating.optional(),

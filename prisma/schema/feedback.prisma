@@ -1,8 +1,9 @@
 model GuestFeedback {
-  id        Int      @id @default(autoincrement())
-  branchId  Int      @map("branch_id")
-  guestName String   @map("guest_name")
-  contact   String
+  id         Int      @id @default(autoincrement())
+  feedbackId String?  @map("feedback_id")
+  branchId   Int      @map("branch_id")
+  guestName  String   @map("guest_name")
+  contact    String
   foodRating     Int? @map("food_rating")
   serviceRating  Int? @map("service_rating")
   environmentRating Int? @map("environment_rating")
@@ -15,6 +16,7 @@ model GuestFeedback {
 
   branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
+  @@index([feedbackId])
   @@index([branchId])
   @@index([submittedAt])
   @@index([overallRating])

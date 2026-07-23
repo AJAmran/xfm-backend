@@ -414,6 +414,14 @@ function randomPastDate(maxDaysAgo: number): Date {
   return new Date(Date.now() - ms);
 }
 
+function createFeedbackId(branchCode: string, date: Date): string {
+  const branchPrefix = branchCode.replace("X-", "").toUpperCase() || "01";
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const random = Math.floor(100 + Math.random() * 900);
+  return `${branchPrefix}${month}${day}${random}`;
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -503,11 +511,11 @@ async function main() {
   await prisma.guestFeedback.createMany({
     data: Array.from({ length: FEEDBACK_COUNT }, (_, i) => {
       const code = branchCodes[i % branchCodes.length]!;
-
-      // Added non-null assertion operator (!) to explicitly satisfy 'noUncheckedIndexedAccess'
       const tpl = FEEDBACK_TEMPLATES[i % FEEDBACK_TEMPLATES.length]!;
+      const submittedAt = randomPastDate(180);
 
       return {
+        feedbackId: createFeedbackId(code, submittedAt),
         branchId: branchMap.get(code)!,
         guestName: tpl.guestName,
         contact: tpl.contact,
@@ -519,7 +527,7 @@ async function main() {
         heardAbout: tpl.heardAbout,
         ageGroup: tpl.ageGroup,
         opinion: tpl.opinion,
-        submittedAt: randomPastDate(180),
+        submittedAt,
       };
     }),
   });
