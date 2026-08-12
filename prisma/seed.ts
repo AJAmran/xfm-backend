@@ -1,4 +1,11 @@
-import { Role, HeardAbout, AgeGroup } from "../generated/prisma/enums";
+import {
+  Role,
+  HeardAbout,
+  AgeGroup,
+  BpCpEntryType,
+  ApprovalStatus,
+  InventoryStatementStatus,
+} from "../generated/prisma/enums";
 import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
@@ -12,23 +19,22 @@ const prisma = new PrismaClient({ adapter });
 const SALT_ROUNDS = Number(process.env.SALT_ROUNDS) || 12;
 
 // ─── Static data ──────────────────────────────────────────────────────────────
-
 const BRANCHES = [
   {
     code: "X-01",
     name: "Xian Restaurant",
     address: "212 New Elephant Road, Dhaka-1205",
     phone: ["01329661662"],
-    latitude: 23.7418,
-    longitude: 90.3927,
+    latitude: 23.740042879559585,
+    longitude: 990.38950769940561,
   },
   {
     code: "X-02",
     name: "Xenial Restaurant",
     address: "House No. 06 (New), Road No. 16 (Old 27), Dhanmondi, Dhaka-1209",
     phone: ["01329661663"],
-    latitude: 23.7465,
-    longitude: 90.3753,
+    latitude: 23.7561511045432,
+    longitude: 90.37447932021232,
   },
   {
     code: "X-03",
@@ -36,32 +42,32 @@ const BRANCHES = [
     address:
       "House No. 55A, Road No. 4A (New), Satmasjid Road, Dhanmondi, Dhaka-1209",
     phone: ["01755636260", "0258617163"],
-    latitude: 23.7467,
-    longitude: 90.3746,
+    latitude: 23.740210145379404,
+    longitude: 90.37477915317342,
   },
   {
     code: "X-04",
     name: "Golden Chimney Restaurant",
     address: "80/14/A Mymensingh Road, Sonargaon Road, Banglamotor, Dhaka-1000",
     phone: ["01755636261", "02223363969"],
-    latitude: 23.7388,
-    longitude: 90.3956,
+    latitude: 23.746062889306078,
+    longitude: 90.39286521010396,
   },
   {
     code: "X-05",
     name: "Xindian Restaurant",
     address: "House No. 55/55A, Road No. 16, Dhanmondi, Dhaka-1209",
     phone: ["01755636262", "0258150396"],
-    latitude: 23.7468,
-    longitude: 90.375,
+    latitude: 23.751946854874433,
+    longitude: 90.36845087231482,
   },
   {
     code: "X-06",
     name: "Xinxian Restaurant, Dhanmondi",
     address: "House No. 7, Road No. 8, Dhanmondi, Dhaka-1205",
     phone: ["01755636263", "04478778843"],
-    latitude: 23.7452,
-    longitude: 90.3765,
+    latitude: 23.74562924055612,
+    longitude: 90.38434549981451,
   },
   {
     code: "X-07",
@@ -69,32 +75,32 @@ const BRANCHES = [
     address:
       "House No. 59A, Road No. 16, Satmasjid Road, Dhanmondi, Dhaka-1209",
     phone: ["01755636264", "0241020520"],
-    latitude: 23.7469,
-    longitude: 90.3749,
+    latitude: 23.751511578924287,
+    longitude: 90.36809039735647,
   },
   {
     code: "X-08",
     name: "Xinxian Restaurant, Mirpur-10",
     address: "6/C, 8/11, Mirpur-11, Dhaka",
     phone: ["01755636265", "0248032146"],
-    latitude: 23.8244,
-    longitude: 90.3665,
+    latitude: 23.81265844550352,
+    longitude: 90.3668630722603,
   },
   {
     code: "X-09",
     name: "Chung Wah Restaurant",
     address: "203, Shaheed Syed Nazrul Islam Sarani, Bijoy Nagar, Dhaka",
     phone: ["01755636267", "029553263"],
-    latitude: 23.7334,
-    longitude: 90.4123,
+    latitude: 23.73312528078283,
+    longitude: 90.40995913192918,
   },
   {
     code: "X-11",
     name: "Xinxian Restaurant, Uttara",
     address: "House No. 1, Road No. 8, Sector-1, Uttara Model Town, Dhaka-1230",
     phone: ["01755636266", "0248958051"],
-    latitude: 23.8742,
-    longitude: 90.3987,
+    latitude: 23.858085605330054,
+    longitude: 90.40174794894915,
   },
   {
     code: "X-12",
@@ -102,8 +108,8 @@ const BRANCHES = [
     address:
       "75, Bir Uttom M A Rob Road, 4th Floor, Shimanto Square Market, Dhanmondi, Dhaka",
     phone: ["01755636268", "01755636321"],
-    latitude: 23.7441,
-    longitude: 90.3669,
+    latitude: 23.73809337714598,
+    longitude: 90.37761096789161,
   },
   {
     code: "X-16",
@@ -111,8 +117,8 @@ const BRANCHES = [
     address:
       "Mirpur New Market, VTCB Tower (5th Floor), Main Road, Mirpur-1, Dhaka-1216",
     phone: ["01709678135", "01709678146"],
-    latitude: 23.8048,
-    longitude: 90.3548,
+    latitude: 23.799770728946406,
+    longitude: 90.35435683584136,
   },
   {
     code: "X-17",
@@ -120,8 +126,8 @@ const BRANCHES = [
     address:
       "Mirpur New Market, VTCB Tower (4th Floor), Main Road, Mirpur-1, Dhaka-1216",
     phone: ["01709678145", "01709678146"],
-    latitude: 23.8048,
-    longitude: 90.3548,
+    latitude: 23.79954398535525,
+    longitude: 90.35437327940905,
   },
   {
     code: "X-18",
@@ -129,8 +135,8 @@ const BRANCHES = [
     address:
       "Section-7, Main Road-03, Avenue-4, Plot-1/1, Pallabi, Mirpur, Dhaka",
     phone: ["01709678171", "01709678172"],
-    latitude: 23.8271,
-    longitude: 90.3658,
+    latitude: 23.81589567663798,
+    longitude: 90.36567282924354,
   },
   {
     code: "X-19",
@@ -138,8 +144,8 @@ const BRANCHES = [
     address:
       "Section-7, Main Road-3, Avenue-4, Plot-1/1 (2nd Floor), Pallabi, Mirpur, Dhaka-1216",
     phone: ["01709678170", "01709678171"],
-    latitude: 23.8271,
-    longitude: 90.3658,
+    latitude: 23.81592431514009,
+    longitude: 90.36567284723233,
   },
 ];
 
@@ -429,6 +435,15 @@ async function main() {
 
   await prisma.$transaction([
     prisma.guestFeedback.deleteMany(),
+    prisma.guestComplaint.deleteMany(),
+    prisma.bpCpEntry.deleteMany(),
+    prisma.managerReport.deleteMany(),
+    prisma.guestDiscountLog.deleteMany(),
+    prisma.guestEntertainmentLog.deleteMany(),
+    prisma.monthlyInventoryLine.deleteMany(),
+    prisma.monthlyInventoryStatement.deleteMany(),
+    prisma.inventoryItem.deleteMany(),
+    prisma.inventoryCategory.deleteMany(),
     prisma.user.deleteMany(),
     prisma.systemSetting.deleteMany(),
   ]);
@@ -545,6 +560,276 @@ async function main() {
     ],
   });
   console.log("  ✓ Settings: defaults created");
+
+  // ─── Inventory master data (seed categories & items from the paper form) ───
+  const CHINAWARE_ITEMS = [
+    "Rice dish",
+    "Service plate",
+    "Dinner plate Round",
+    "Dinner Plate Square",
+    "Soup liner",
+    "Small soup bowl",
+    "Big soup bowl",
+    "Table soup cup",
+    "BBQ Plate",
+    "Sauce set",
+    "Salt & pepper set",
+    "Soya sauce bottle",
+    "Tea cup",
+    "Tea pot",
+    "Sugar pot",
+    "Sugar Bowl",
+    "Milk pot",
+    "Ice cream cup",
+    "Tea saucer",
+    "Sauce Bowl",
+    "Flower vase",
+    "Finger bowl",
+    "Toothpick Holder",
+  ];
+  const GLASSWARE_ITEMS = [
+    "Tumbler",
+    "Water glass",
+    "Highball glass",
+    "Shot glass",
+  ];
+
+  const chinaware = await prisma.inventoryCategory.create({
+    data: { name: "Chinaware", sortOrder: 1 },
+  });
+  const glassware = await prisma.inventoryCategory.create({
+    data: { name: "Glassware", sortOrder: 2 },
+  });
+
+  await prisma.inventoryItem.createMany({
+    data: [
+      ...CHINAWARE_ITEMS.map((name, i) => ({
+        categoryId: chinaware.id,
+        name,
+        sortOrder: i + 1,
+      })),
+      ...GLASSWARE_ITEMS.map((name, i) => ({
+        categoryId: glassware.id,
+        name,
+        sortOrder: i + 1,
+      })),
+    ],
+  });
+  console.log(
+    `  ✓ Inventory: ${chinaware.name} (${CHINAWARE_ITEMS.length} items) + ${glassware.name} (${GLASSWARE_ITEMS.length} items)`,
+  );
+
+  // ─── Sample records for the new operational modules ─────────────────────────
+  const managers = await prisma.user.findMany({
+    where: { role: Role.BRANCH_MANAGER, branchId: { not: null } },
+    select: { id: true, branchId: true },
+  });
+  const managerByBranch = new Map(
+    managers.filter((m) => m.branchId != null).map((m) => [m.branchId!, m.id]),
+  );
+  const adminUser = await prisma.user.findFirst({
+    where: { role: Role.ADMIN },
+    select: { id: true },
+  });
+  const superAdminUser = await prisma.user.findFirst({
+    where: { role: Role.SUPER_ADMIN },
+    select: { id: true },
+  });
+
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  const yesterdayStr = new Date(today.getTime() - 86400000)
+    .toISOString()
+    .slice(0, 10);
+
+  // 2 manager reports (yesterday + today) for the first two branches
+  const sampleBranches = createdBranches.slice(0, 2);
+  for (let idx = 0; idx < sampleBranches.length; idx += 1) {
+    const branch = sampleBranches[idx]!;
+    const managerId = managerByBranch.get(branch.id) ?? superAdminUser?.id;
+    if (!managerId) continue;
+
+    await prisma.managerReport.create({
+      data: {
+        branchId: branch.id,
+        managerName: branch.name,
+        reportDate: new Date(idx === 0 ? yesterdayStr : todayStr),
+        managerComments:
+          "শিফট শেষে ম্যানেজমেন্ট কে জানানো জরুরী বিষয়গুলো রেকর্ড করা হয়েছে।",
+        supplyPurchaseIssues:
+          "কিছু কাঁচামালের সাপ্লাই দেরি হয়েছে, সরবরাহকারীর সাথে যোগাযোগ চলছে।",
+        briefingPoints:
+          "স্টাফ ব্রিফিংয়ে সকালের টার্গেট নিয়ে আলোচনা করা হয়েছে।",
+        dailyLearnings: "লাঞ্চ টাইমে স্টাফ শিফট রোটেশন আরও ভালোভাবে করতে হবে।",
+        createdByUserId: managerId,
+        complaints: {
+          create: [
+            {
+              guestName: "কাস্টমার রবিন",
+              mobile: "01711110000",
+              email: "robin@example.com",
+              complaintDetails: "অর্ডার ডেলিভারি দেরি হয়েছে।",
+              serviceProviderName: "ওয়েটার কামাল",
+              responsiblePerson: "শিফট ম্যানেজার",
+              actionTaken: "ক্ষমা চাওয়া হয়েছে ও ডেজার্ট পরিবেশন করা হয়েছে।",
+              solution: "ডেলিভারি টাইম মনিটরিং বৃদ্ধি করা হয়েছে।",
+            },
+            {
+              guestName: "কাস্টমার সুমাইয়া",
+              mobile: "01722220000",
+              complaintDetails: "ফুড কুয়ালিটি নিয়ে অভিযোগ।",
+              serviceProviderName: "চেফ",
+              responsiblePerson: "চেফ ইন চার্জ",
+              actionTaken: "ডিশ রি-মেক করে পরিবেশন করা হয়েছে।",
+              solution: "কুয়ালিটি চেক প্রসেস শক্তিশালী করা হয়েছে।",
+            },
+          ],
+        },
+        bpCpEntries: {
+          create: [
+            {
+              entryType: BpCpEntryType.TODAY,
+              guestName: "মেহেদী",
+              mobile: "01733330000",
+              comment: "আজকের ভিজিট, পরিচিত কাস্টমার।",
+            },
+            {
+              entryType: BpCpEntryType.TOMORROW,
+              guestName: "নাফিসা",
+              mobile: "01744440000",
+              comment: "আগামীকাল ফ্যামিলি ডিনার রিজার্ভেশন।",
+            },
+          ],
+        },
+      },
+    });
+  }
+  console.log(`  ✓ Manager Reports: ${sampleBranches.length} sample reports`);
+
+  // Guest discount logs (1 approved + 1 pending) + 1 entertainment log
+  const branch0 = createdBranches[0]!;
+  const branch1 = createdBranches[1]!;
+  const manager0 = managerByBranch.get(branch0.id) ?? adminUser?.id;
+
+  if (manager0) {
+    await prisma.guestDiscountLog.create({
+      data: {
+        branchId: branch0.id,
+        logDate: new Date(todayStr),
+        guestName: "হাবিবুর রহমান",
+        mobile: "01755550000",
+        hadLunch: true,
+        hadDinner: false,
+        totalBill: 4500,
+        discountPercent: 10,
+        discountAmount: 450,
+        reasonForDiscount: "বিবাহবার্ষিকী উপলক্ষে বিশেষ ছাড়।",
+        offeredByUserId: manager0,
+        approvalStatus: ApprovalStatus.APPROVED,
+        verifiedByUserId: adminUser?.id ?? null,
+        approvedByUserId: adminUser?.id ?? null,
+        approvedAt: new Date(),
+      },
+    });
+    await prisma.guestDiscountLog.create({
+      data: {
+        branchId: branch1.id,
+        logDate: new Date(yesterdayStr),
+        guestName: "শারমিন",
+        mobile: "01766660000",
+        hadLunch: false,
+        hadDinner: true,
+        totalBill: 3200,
+        discountPercent: 5,
+        discountAmount: 160,
+        reasonForDiscount: "বারবার আসা কাস্টমার, লয়্যালটি ডিসকাউন্ট।",
+        offeredByUserId: managerByBranch.get(branch1.id) ?? manager0,
+        approvalStatus: ApprovalStatus.PENDING,
+      },
+    });
+    await prisma.guestEntertainmentLog.create({
+      data: {
+        branchId: branch0.id,
+        logDate: new Date(todayStr),
+        guestName: "সজীব ও তার দল",
+        mobile: "01777770000",
+        hadLunch: true,
+        hadDinner: true,
+        foodName: "চীজ কর্ন স্যুপ",
+        foodCost: 1200,
+        reasonForEntertainment:
+          "নতুন ব্রাঞ্চ উদ্বোধন উপলক্ষে পরিচিত কাস্টমারকে এন্টারটেইন।",
+        offeredByUserId: manager0,
+        approvalStatus: ApprovalStatus.PENDING,
+      },
+    });
+    console.log("  ✓ Guest Offers: 2 discount logs + 1 entertainment log");
+  }
+
+  // Inventory statements: previous month (filled) + current month (opening carried)
+  const activeItems = await prisma.inventoryItem.findMany({
+    where: { isDeleted: false, isActive: true },
+    select: { id: true },
+    orderBy: { sortOrder: "asc" },
+  });
+
+  if (activeItems.length && manager0) {
+    const now = new Date();
+    const prevMonth = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1),
+    );
+    const curMonth = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+    );
+
+    const prevStatement = await prisma.monthlyInventoryStatement.create({
+      data: {
+        branchId: branch0.id,
+        statementMonth: prevMonth,
+        status: InventoryStatementStatus.SUBMITTED,
+        submittedByUserId: manager0,
+        submittedAt: new Date(
+          Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 20),
+        ),
+        lines: {
+          create: activeItems.map((item, i) => ({
+            itemId: item.id,
+            openingStock: 10 + i,
+            added: 5,
+            brokenLost: i % 3 === 0 ? 1 : 0,
+            reject: i % 5 === 0 ? 1 : 0,
+            closingStock:
+              10 + i + 5 - (i % 3 === 0 ? 1 : 0) - (i % 5 === 0 ? 1 : 0),
+          })),
+        },
+      },
+    });
+
+    const prevLines = await prisma.monthlyInventoryLine.findMany({
+      where: { statementId: prevStatement.id },
+      select: { itemId: true, closingStock: true },
+    });
+    const prevClosing = new Map(
+      prevLines.map((l) => [l.itemId, l.closingStock]),
+    );
+
+    await prisma.monthlyInventoryStatement.create({
+      data: {
+        branchId: branch0.id,
+        statementMonth: curMonth,
+        status: InventoryStatementStatus.DRAFT,
+        lines: {
+          create: activeItems.map((item) => ({
+            itemId: item.id,
+            openingStock: prevClosing.get(item.id) ?? 0,
+          })),
+        },
+      },
+    });
+    console.log(
+      `  ✓ Inventory Statements: previous month filled + current month (${activeItems.length} lines each)`,
+    );
+  }
 
   console.log("\n✅ Seeding complete.\n");
 }

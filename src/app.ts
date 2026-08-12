@@ -16,6 +16,9 @@ import { DashboardRoutes } from "./modules/dashboard/dashboard.routes";
 import { AnalyticsRoutes } from "./modules/analytics/analytics.routes";
 import { ReportsRoutes } from "./modules/reports/reports.routes";
 import { SettingsRoutes } from "./modules/settings/settings.routes";
+import { ManagerReportRoutes } from "./modules/manager-report/manager-report.routes";
+import { GuestOfferRoutes } from "./modules/guest-offer/guest-offer.routes";
+import { InventoryRoutes } from "./modules/inventory/inventory.routes";
 
 const app: Application = express();
 
@@ -84,6 +87,9 @@ app.use(`${v1}/dashboard`, DashboardRoutes);
 app.use(`${v1}/analytics`, AnalyticsRoutes);
 app.use(`${v1}/reports`, ReportsRoutes);
 app.use(`${v1}/settings`, SettingsRoutes);
+app.use(`${v1}/manager-reports`, ManagerReportRoutes);
+app.use(`${v1}/guest-offers`, GuestOfferRoutes);
+app.use(`${v1}/inventory`, InventoryRoutes);
 
 app.use(globalErrorHandler);
 

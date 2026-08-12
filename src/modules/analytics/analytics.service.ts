@@ -29,7 +29,7 @@ export async function getBranchPerformance(startDate?: string, endDate?: string)
   return withCache(cacheKey, async () => {
     const where = buildFeedbackWhere({ startDate, endDate });
 
-    const [branches, performance] = await Promise.all([
+    const [branches, performance, distribution] = await Promise.all([
       prisma.branch.findMany({
         where: { isDeleted: false },
         select: {
@@ -45,18 +45,39 @@ export async function getBranchPerformance(startDate?: string, endDate?: string)
         where,
         _avg: { overallRating: true, foodRating: true, serviceRating: true, environmentRating: true, eventRating: true },
       }),
+      prisma.guestFeedback.groupBy({
+        by: ["branchId", "overallRating"],
+        where,
+        _count: true,
+      }),
     ]);
 
     const perfMap = new Map(performance.map((p) => [p.branchId, p._avg]));
+    const sentimentMap = new Map<number, { positive: number; negative: number }>();
+    for (const d of distribution) {
+      if (d.overallRating === null) continue;
+      const entry = sentimentMap.get(d.branchId) ?? { positive: 0, negative: 0 };
+      if (d.overallRating >= 4) entry.positive += d._count;
+      else if (d.overallRating <= 2) entry.negative += d._count;
+      sentimentMap.set(d.branchId, entry);
+    }
 
-    return branches.map((b) => ({
-      id: b.id,
-      name: b.name,
-      code: b.code,
-      isActive: b.isActive,
-      totalFeedbacks: b._count.feedback,
-      averageRatings: perfMap.get(b.id) ?? null,
-    }));
+    return branches.map((b) => {
+      const sentiment = sentimentMap.get(b.id) ?? { positive: 0, negative: 0 };
+      const total = b._count.feedback;
+      return {
+        id: b.id,
+        name: b.name,
+        code: b.code,
+        isActive: b.isActive,
+        totalFeedbacks: total,
+        positiveFeedback: sentiment.positive,
+        negativeFeedback: sentiment.negative,
+        positivePercentage: total ? Math.round((sentiment.positive / total) * 100) : 0,
+        negativePercentage: total ? Math.round((sentiment.negative / total) * 100) : 0,
+        averageRatings: perfMap.get(b.id) ?? null,
+      };
+    });
   }, 300);
 }
 
@@ -206,6 +227,10 @@ export async function getDashboardSummary(branchId?: number, startDate?: string,
            branchName: b.name,
            totalFeedback: b.totalFeedbacks,
            averageRating: parseFloat(avg.toFixed(1)),
+           positiveFeedback: b.positiveFeedback ?? 0,
+           negativeFeedback: b.negativeFeedback ?? 0,
+           positivePercentage: b.positivePercentage ?? 0,
+           negativePercentage: b.negativePercentage ?? 0,
          };
       }),
       daily,

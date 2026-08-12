@@ -30,3 +30,9 @@ export async function negativeFeedback(req: Request, res: Response) {
   const data = await dashboardService.getNegativeFeedback(branchId, query.startDate, query.endDate);
   successResponse(res, "Negative feedback retrieved successfully", data);
 }
+
+export async function operationalWidgets(req: Request, res: Response) {
+  const branchId = req.user?.role === "BRANCH_MANAGER" ? req.user.branchId ?? undefined : undefined;
+  const data = await dashboardService.getOperationalWidgets(branchId);
+  successResponse(res, "Operational widgets retrieved successfully", data);
+}

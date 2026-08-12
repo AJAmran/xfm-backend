@@ -1054,6 +1054,545 @@ Downloads an `.xlsx` file (limited to `REPORT_EXPORT_LIMIT` records, default 500
 
 ---
 
+## 12A. Daily Manager Report APIs
+
+Base path: `/api/v1/manager-reports`
+
+All endpoints require `SUPER_ADMIN`, `ADMIN`, or `BRANCH_MANAGER`.
+
+> **Branch Manager Scope:** `BRANCH_MANAGER` requests are automatically scoped to their own branch. A `BRANCH_MANAGER` may only edit or delete a report on the day it was created (`reportDate === today`). Writes that would move a report to a different branch are forbidden.
+
+**Nested records:** A report can include `complaints` (guest complaints) and `bpCpEntries` (briefing points / carry-over points). Both are created/updated atomically with the report inside a DB transaction.
+
+---
+
+### Create Manager Report
+
+**POST** `/api/v1/manager-reports`
+
+**Request Body**
+```json
+{
+  "branchId": 1,
+  "managerName": "Rahim Uddin",
+  "reportDate": "2026-08-03",
+  "managerComments": "Good evening service flow.",
+  "supplyPurchaseIssues": "Rice stock running low.",
+  "briefingPoints": "Reinforce table-clearing speed.",
+  "dailyLearnings": "Large group handled well.",
+  "complaints": [
+    {
+      "guestName": "Tanvir Ahmed",
+      "mobile": "01711111111",
+      "email": "tanvir@example.com",
+      "complaintDetails": "Serving delay at table 5.",
+      "serviceProviderName": "Waiter",
+      "responsiblePerson": "Karim",
+      "actionTaken": "Apologized and expedited order.",
+      "solution": "Complimentary dessert provided."
+    }
+  ],
+  "bpCpEntries": [
+    {
+      "entryType": "TOMORROW",
+      "guestName": "Nusrat Jahan",
+      "mobile": "01822222222",
+      "comment": "VIP booking for tomorrow."
+    }
+  ]
+}
+```
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `branchId` | number (int) | Yes | Branch ID (ignored/forced for BRANCH_MANAGER) |
+| `managerName` | string (min 1) | Yes | Manager's name |
+| `reportDate` | string `YYYY-MM-DD` | Yes | Report date |
+| `managerComments` | string | No | General comments |
+| `supplyPurchaseIssues` | string | No | Supply/purchase issues |
+| `briefingPoints` | string | No | Briefing points |
+| `dailyLearnings` | string | No | Daily learnings |
+| `complaints` | array (max 50) | No | Guest complaints (see above) |
+| `bpCpEntries` | array (max 50) | No | BP/CP entries (`entryType`: `TODAY` \| `TOMORROW`) |
+
+**Response (201)** — Created report with nested `complaints` and `bpCpEntries`
+
+**Errors:** 404 (`Branch not found`), 409 (`A report already exists for this branch on {date}`), 422
+
+---
+
+### List Manager Reports
+
+**GET** `/api/v1/manager-reports`
+
+**Query Parameters**
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `page` | string | `"1"` | Page number |
+| `limit` | string | `"10"` | Items per page |
+| `sortBy` | string | `"reportDate"` | Sort field |
+| `sortOrder` | `"asc"` \| `"desc"` | `"desc"` | Sort direction |
+| `branchId` | string | — | Branch filter (ignored for BRANCH_MANAGER) |
+| `managerName` | string | — | Filter by manager name |
+| `startDate` | string `YYYY-MM-DD` | — | Start date filter |
+| `endDate` | string `YYYY-MM-DD` | — | End date filter |
+
+**Response (200)** — Paginated list (standard envelope) with nested `branch`, `complaints`, `bpCpEntries`
+
+---
+
+### Get Manager Report
+
+**GET** `/api/v1/manager-reports/:id`
+
+**Response (200)** — Single report with nested records
+
+**Errors:** 404 (`Manager report not found`)
+
+---
+
+### Update Manager Report
+
+**PATCH** `/api/v1/manager-reports/:id`
+
+**Request Body** (all optional, same field types as create, minus `branchId`)
+
+**Response (200)** — Updated report
+
+**Errors:** 403 (BRANCH_MANAGER editing a previous day's report), 404
+
+---
+
+### Delete Manager Report (Soft Delete)
+
+**DELETE** `/api/v1/manager-reports/:id`
+
+**Response (200)**
+```json
+{ "success": true, "message": "Manager report deleted successfully", "data": {} }
+```
+
+**Errors:** 403 (BRANCH_MANAGER deleting a previous day's report), 404
+
+---
+
+## 12B. Guest Discount & Entertainment APIs
+
+Base path: `/api/v1/guest-offers`
+
+All endpoints require `SUPER_ADMIN`, `ADMIN`, or `BRANCH_MANAGER`. Approval endpoints (`.../approval`) require `SUPER_ADMIN` or `ADMIN` only.
+
+> **Branch Manager Scope:** `BRANCH_MANAGER` requests are automatically scoped to their own branch.
+>
+> **Business rule:** `discountAmount` is always computed server-side as `totalBill * discountPercent / 100`. A client-supplied value is ignored.
+
+---
+
+### Guest Offers Summary
+
+**GET** `/api/v1/guest-offers/summary`
+
+**Query Parameters**
+| Param | Type | Description |
+|---|---|---|
+| `branchId` | string | Branch filter (ignored for BRANCH_MANAGER) |
+| `startDate` | string `YYYY-MM-DD` | Start date filter |
+| `endDate` | string `YYYY-MM-DD` | End date filter |
+
+**Response (200)**
+```json
+{
+  "success": true,
+  "message": "Guest offer summary retrieved successfully",
+  "data": {
+    "discount": { "totalBill": 12500, "totalDiscountAmount": 875, "logs": 2 },
+    "entertainment": { "totalCost": 450, "logs": 1 }
+  }
+}
+```
+
+---
+
+### Create Discount Log
+
+**POST** `/api/v1/guest-offers/discounts`
+
+**Request Body**
+```json
+{
+  "branchId": 1,
+  "logDate": "2026-08-03",
+  "guestName": "Sadia Islam",
+  "mobile": "01933333333",
+  "hadLunch": true,
+  "hadDinner": false,
+  "totalBill": 5000,
+  "discountPercent": 10,
+  "reasonForDiscount": "Returning VIP guest"
+}
+```
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `branchId` | number (int) | Yes | Branch ID (ignored/forced for BRANCH_MANAGER) |
+| `logDate` | string `YYYY-MM-DD` | Yes | Date of offer |
+| `guestName` | string (min 1) | Yes | Guest name |
+| `mobile` | string (min 1) | Yes | Guest mobile |
+| `hadLunch` | boolean | No | Guest had lunch (default false) |
+| `hadDinner` | boolean | No | Guest had dinner (default false) |
+| `totalBill` | number > 0 (2 dp) | Yes | Total bill before discount |
+| `discountPercent` | number > 0, ≤ 100 (2 dp) | Yes | Discount percentage |
+| `reasonForDiscount` | string (min 1) | Yes | Reason |
+
+**Response (201)** — Created log with server-computed `discountAmount` (`approvalStatus: "PENDING"`)
+
+**Errors:** 404 (`Branch not found`), 422
+
+---
+
+### List Discount Logs
+
+**GET** `/api/v1/guest-offers/discounts`
+
+**Query Parameters**
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `page` | string | `"1"` | Page number |
+| `limit` | string | `"10"` | Items per page |
+| `sortBy` | string | `"logDate"` | Sort field |
+| `sortOrder` | `"asc"` \| `"desc"` | `"desc"` | Sort direction |
+| `branchId` | string | — | Branch filter (ignored for BRANCH_MANAGER) |
+| `logDate` | string `YYYY-MM-DD` | — | Exact date filter |
+| `startDate` | string `YYYY-MM-DD` | — | Start date filter |
+| `endDate` | string `YYYY-MM-DD` | — | End date filter |
+| `approvalStatus` | enum | — | `PENDING`, `APPROVED`, `REJECTED` |
+| `search` | string | — | Search `guestName` and `mobile` |
+
+**Response (200)** — Paginated list with nested `branch` and `offeredBy`
+
+---
+
+### Get Discount Log
+
+**GET** `/api/v1/guest-offers/discounts/:id`
+
+**Response (200)** — Single log
+
+**Errors:** 404 (`Discount log not found`)
+
+---
+
+### Update Discount Log
+
+**PATCH** `/api/v1/guest-offers/discounts/:id`
+
+**Request Body** — Any subset of the create fields (all optional)
+
+**Response (200)** — Updated log (server re-computes `discountAmount` when `totalBill`/`discountPercent` change)
+
+**Errors:** 404
+
+---
+
+### Set Discount Approval
+
+**PATCH** `/api/v1/guest-offers/discounts/:id/approval`
+
+**Auth:** `SUPER_ADMIN`, `ADMIN` (only)
+
+**Request Body**
+```json
+{ "approvalStatus": "APPROVED" }
+```
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `approvalStatus` | enum | Yes | `APPROVED` or `REJECTED` |
+
+**Response (200)** — Updated log with `approvalStatus`, `verifiedBy`, `approvedBy`, `approvedAt`
+
+**Errors:** 403 (BRANCH_MANAGER), 404
+
+---
+
+### Delete Discount Log (Soft Delete)
+
+**DELETE** `/api/v1/guest-offers/discounts/:id`
+
+**Response (200)** — Soft-deleted
+
+---
+
+### Create Entertainment Log
+
+**POST** `/api/v1/guest-offers/entertainments`
+
+**Request Body**
+```json
+{
+  "branchId": 1,
+  "logDate": "2026-08-03",
+  "guestName": "Mehedi Hasan",
+  "mobile": "01644444444",
+  "hadLunch": false,
+  "hadDinner": true,
+  "foodName": "Grilled Salmon",
+  "foodCost": 450,
+  "reasonForEntertainment": "Complaint resolution"
+}
+```
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `branchId` | number (int) | Yes | Branch ID |
+| `logDate` | string `YYYY-MM-DD` | Yes | Date of offer |
+| `guestName` | string (min 1) | Yes | Guest name |
+| `mobile` | string (min 1) | Yes | Guest mobile |
+| `hadLunch` | boolean | No | Had lunch (default false) |
+| `hadDinner` | boolean | No | Had dinner (default false) |
+| `foodName` | string (min 1) | Yes | Complimentary food name |
+| `foodCost` | number > 0 (2 dp) | Yes | Food cost |
+| `reasonForEntertainment` | string (min 1) | Yes | Reason |
+
+**Response (201)** — Created log (`approvalStatus: "PENDING"`)
+
+---
+
+### List Entertainment Logs
+
+**GET** `/api/v1/guest-offers/entertainments`
+
+Same query parameters as the discount list.
+
+**Response (200)** — Paginated list
+
+---
+
+### Get / Update / Approve / Delete Entertainment Log
+
+- **GET** `/api/v1/guest-offers/entertainments/:id`
+- **PATCH** `/api/v1/guest-offers/entertainments/:id`
+- **PATCH** `/api/v1/guest-offers/entertainments/:id/approval` — `SUPER_ADMIN`, `ADMIN` only
+- **DELETE** `/api/v1/guest-offers/entertainments/:id` (soft delete)
+
+Mirror the discount-log behaviors described above.
+
+---
+
+## 12C. Convention Monthly Inventory APIs
+
+Base path: `/api/v1/inventory`
+
+All endpoints require `SUPER_ADMIN`, `ADMIN`, or `BRANCH_MANAGER`. Category and item **writes** require `SUPER_ADMIN` or `ADMIN` only.
+
+> **Branch Manager Scope:** Statements created by a `BRANCH_MANAGER` are automatically assigned to their own branch.
+>
+> **Business rules:**
+> - Creating a statement for a month auto-generates one line per active inventory item, carrying over the previous month's `closingStock` as the new `openingStock`.
+> - `closingStock = openingStock + added - brokenLost - reject`, always computed server-side (never trusted from the client).
+> - A submitted statement becomes read-only on the frontend; `SUPER_ADMIN`/`ADMIN` can `LOCK` a submitted statement.
+
+---
+
+### List Categories
+
+**GET** `/api/v1/inventory/categories`
+
+**Response (200)** — Array of active categories `{ id, name, sortOrder, isActive }`
+
+---
+
+### Create / Update / Delete Category
+
+- **POST** `/api/v1/inventory/categories` — `SUPER_ADMIN`, `ADMIN`
+- **PATCH** `/api/v1/inventory/categories/:id` — `SUPER_ADMIN`, `ADMIN`
+- **DELETE** `/api/v1/inventory/categories/:id` — `SUPER_ADMIN`, `ADMIN` (soft delete)
+
+**Create body:** `{ "name": "Chinaware", "sortOrder": 1, "isActive": true }`
+
+---
+
+### List Items
+
+**GET** `/api/v1/inventory/items`
+
+**Query Parameters**
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `categoryId` | string | — | Filter by category |
+| `page` | string | `"1"` | Page number |
+| `limit` | string | `"100"` | Items per page |
+| `sortBy` | string | `"sortOrder"` | Sort field |
+| `sortOrder` | `"asc"` \| `"desc"` | `"asc"` | Sort direction |
+
+**Response (200)** — Paginated list of active items with nested `category`
+
+---
+
+### Create / Update / Delete Item
+
+- **POST** `/api/v1/inventory/items` — `SUPER_ADMIN`, `ADMIN`
+- **PATCH** `/api/v1/inventory/items/:id` — `SUPER_ADMIN`, `ADMIN`
+- **DELETE** `/api/v1/inventory/items/:id` — `SUPER_ADMIN`, `ADMIN` (soft delete)
+
+**Create body:** `{ "categoryId": 1, "name": "Rice Plate", "sortOrder": 1 }`
+
+---
+
+### Create Inventory Statement
+
+**POST** `/api/v1/inventory/statements`
+
+**Request Body**
+```json
+{ "branchId": 1, "statementMonth": "2026-08" }
+```
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `branchId` | number (int) | No | Branch (ignored/forced for BRANCH_MANAGER; defaults to branch for others if omitted) |
+| `statementMonth` | string `YYYY-MM` | Yes | Statement month |
+
+**Response (201)** — New statement (`status: "DRAFT"`) with generated lines
+
+**Errors:** 409 (`An inventory statement already exists for this branch and month`), 404 (`Branch not found`)
+
+---
+
+### List Statements
+
+**GET** `/api/v1/inventory/statements`
+
+**Query Parameters**
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `page` | string | `"1"` | Page number |
+| `limit` | string | `"10"` | Items per page |
+| `sortBy` | string | `"statementMonth"` | Sort field |
+| `sortOrder` | `"asc"` \| `"desc"` | `"desc"` | Sort direction |
+| `branchId` | string | — | Branch filter (ignored for BRANCH_MANAGER) |
+| `statementMonth` | string `YYYY-MM` | — | Month filter |
+| `status` | enum | — | `DRAFT`, `SUBMITTED`, `LOCKED` |
+
+**Response (200)** — Paginated list with nested `branch`
+
+---
+
+### Get Statement
+
+**GET** `/api/v1/inventory/statements/:id`
+
+**Response (200)** — Statement with nested `branch`
+
+---
+
+### Get Statement Lines (Grouped)
+
+**GET** `/api/v1/inventory/statements/:id/lines`
+
+**Response (200)** — Array of lines, each with nested item and category:
+```json
+{
+  "success": true,
+  "message": "Inventory statement lines retrieved successfully",
+  "data": [
+    {
+      "id": 1,
+      "itemId": 3,
+      "openingStock": 200,
+      "added": 50,
+      "brokenLost": 2,
+      "reject": 1,
+      "closingStock": 247,
+      "item": { "name": "Rice Plate", "category": { "name": "Chinaware" } }
+    }
+  ]
+}
+```
+
+---
+
+### Update Statement Lines
+
+**PATCH** `/api/v1/inventory/statements/:id/lines`
+
+**Request Body**
+```json
+{
+  "lines": [
+    { "itemId": 3, "added": 50, "brokenLost": 2, "reject": 1 },
+    { "itemId": 4, "added": 10 }
+  ]
+}
+```
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `lines[].itemId` | number (int) | Yes | Item ID (must belong to this statement) |
+| `lines[].added` | number (int ≥ 0) | No | Units added |
+| `lines[].brokenLost` | number (int ≥ 0) | No | Units broken/lost |
+| `lines[].reject` | number (int ≥ 0) | No | Units rejected |
+
+**Response (200)** — Updated statement with recomputed `closingStock` per line
+
+**Errors:** 404 (`Statement not found`), 400 (item does not belong to the statement / statement not editable)
+
+---
+
+### Update Statement Status
+
+**PATCH** `/api/v1/inventory/statements/:id/status`
+
+**Request Body**
+```json
+{ "status": "SUBMITTED" }
+```
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `status` | enum | Yes | `SUBMITTED` or `LOCKED` |
+
+**Response (200)** — Updated statement (`submittedAt` is set on first submit)
+
+**Errors:** 404, 400 (invalid transition, e.g. editing a locked statement)
+
+---
+
+## 12D. Operational Dashboard Widgets
+
+Base path: `/api/v1/dashboard`
+
+### Operational Widgets
+
+**GET** `/api/v1/dashboard/operational-widgets`
+
+**Auth:** `SUPER_ADMIN`, `ADMIN`, `BRANCH_MANAGER` (scoped to own branch)
+
+**Response (200)**
+```json
+{
+  "success": true,
+  "message": "Operational widgets retrieved successfully",
+  "data": {
+    "pendingApprovals": { "total": 3, "discounts": 2, "entertainments": 1 },
+    "managerReportsSubmittedToday": 2,
+    "inventoryThisMonth": { "submitted": 4, "draft": 9, "branchesWithStatement": 13 }
+  }
+}
+```
+
+---
+
+## 12E. Reports Module Excel Exports
+
+Base path: `/api/v1/reports`
+
+All require `SUPER_ADMIN`, `ADMIN`, or `BRANCH_MANAGER` (scoped to own branch). All honor `startDate`/`endDate` (YYYY-MM-DD) query params and are bounded by `REPORT_EXPORT_LIMIT`.
+
+| Endpoint | Filename | Sheets / Columns |
+|---|---|---|
+| `GET /api/v1/reports/export/excel/manager-reports` | `manager-reports.xlsx` | "Manager Reports" + "Guest Complaints" |
+| `GET /api/v1/reports/export/excel/guest-offers/discounts` | `guest-discount-logs.xlsx` | "Discount Logs" |
+| `GET /api/v1/reports/export/excel/guest-offers/entertainments` | `guest-entertainment-logs.xlsx` | "Entertainment Logs" |
+| `GET /api/v1/reports/export/excel/inventory` | `inventory-statement.xlsx` | One sheet per branch/month with Category, Item, Opening, Added, Broken/Lost, Reject, Closing |
+
+The inventory export also accepts `statementMonth` (YYYY-MM); when omitted it exports the current month.
+
+---
+
 ## 13. System Settings APIs
 
 Base path: `/api/v1/settings`
@@ -1203,9 +1742,46 @@ Returns all `SystemSetting` rows as a flat key-value object.
 | 33 | GET | `/api/v1/reports/monthly` | All roles | Monthly report |
 | 34 | GET | `/api/v1/reports/branch` | All roles | Branch report |
 | 35 | GET | `/api/v1/reports/export/excel` | All roles | Excel download |
-| 36 | GET | `/api/v1/reports/export/pdf` | All roles | Not implemented (501) |
-| 37 | GET | `/api/v1/settings` | None | Public settings |
-| 38 | PUT | `/api/v1/settings` | SUPER_ADMIN | Update settings |
+| 36 | GET | `/api/v1/reports/export/excel/manager-reports` | All roles | Manager reports Excel |
+| 37 | GET | `/api/v1/reports/export/excel/guest-offers/discounts` | All roles | Discount logs Excel |
+| 38 | GET | `/api/v1/reports/export/excel/guest-offers/entertainments` | All roles | Entertainment logs Excel |
+| 39 | GET | `/api/v1/reports/export/excel/inventory` | All roles | Inventory statement Excel |
+| 40 | GET | `/api/v1/reports/export/pdf` | All roles | Not implemented (501) |
+| 41 | GET | `/api/v1/manager-reports` | All roles | List manager reports (scoped) |
+| 42 | POST | `/api/v1/manager-reports` | All roles | Create manager report |
+| 43 | GET | `/api/v1/manager-reports/:id` | All roles | Get manager report |
+| 44 | PATCH | `/api/v1/manager-reports/:id` | All roles | Update manager report |
+| 45 | DELETE | `/api/v1/manager-reports/:id` | All roles | Soft delete manager report |
+| 46 | GET | `/api/v1/guest-offers/summary` | All roles | Guest offer summary |
+| 47 | GET | `/api/v1/guest-offers/discounts` | All roles | List discount logs |
+| 48 | POST | `/api/v1/guest-offers/discounts` | All roles | Create discount log |
+| 49 | GET | `/api/v1/guest-offers/discounts/:id` | All roles | Get discount log |
+| 50 | PATCH | `/api/v1/guest-offers/discounts/:id` | All roles | Update discount log |
+| 51 | PATCH | `/api/v1/guest-offers/discounts/:id/approval` | SUPER_ADMIN, ADMIN | Approve/reject discount |
+| 52 | DELETE | `/api/v1/guest-offers/discounts/:id` | All roles | Soft delete discount log |
+| 53 | GET | `/api/v1/guest-offers/entertainments` | All roles | List entertainment logs |
+| 54 | POST | `/api/v1/guest-offers/entertainments` | All roles | Create entertainment log |
+| 55 | GET | `/api/v1/guest-offers/entertainments/:id` | All roles | Get entertainment log |
+| 56 | PATCH | `/api/v1/guest-offers/entertainments/:id` | All roles | Update entertainment log |
+| 57 | PATCH | `/api/v1/guest-offers/entertainments/:id/approval` | SUPER_ADMIN, ADMIN | Approve/reject entertainment |
+| 58 | DELETE | `/api/v1/guest-offers/entertainments/:id` | All roles | Soft delete entertainment log |
+| 59 | GET | `/api/v1/inventory/categories` | All roles | List categories |
+| 60 | POST | `/api/v1/inventory/categories` | SUPER_ADMIN, ADMIN | Create category |
+| 61 | PATCH | `/api/v1/inventory/categories/:id` | SUPER_ADMIN, ADMIN | Update category |
+| 62 | DELETE | `/api/v1/inventory/categories/:id` | SUPER_ADMIN, ADMIN | Soft delete category |
+| 63 | GET | `/api/v1/inventory/items` | All roles | List items |
+| 64 | POST | `/api/v1/inventory/items` | SUPER_ADMIN, ADMIN | Create item |
+| 65 | PATCH | `/api/v1/inventory/items/:id` | SUPER_ADMIN, ADMIN | Update item |
+| 66 | DELETE | `/api/v1/inventory/items/:id` | SUPER_ADMIN, ADMIN | Soft delete item |
+| 67 | POST | `/api/v1/inventory/statements` | All roles | Create statement |
+| 68 | GET | `/api/v1/inventory/statements` | All roles | List statements (scoped) |
+| 69 | GET | `/api/v1/inventory/statements/:id` | All roles | Get statement |
+| 70 | GET | `/api/v1/inventory/statements/:id/lines` | All roles | Get grouped lines |
+| 71 | PATCH | `/api/v1/inventory/statements/:id/lines` | All roles | Update lines |
+| 72 | PATCH | `/api/v1/inventory/statements/:id/status` | All roles | Submit/lock statement |
+| 73 | GET | `/api/v1/dashboard/operational-widgets` | All roles | Operational widgets |
+| 74 | GET | `/api/v1/settings` | None | Public settings |
+| 75 | PUT | `/api/v1/settings` | SUPER_ADMIN | Update settings |
 
 ## 16. API Authorization Matrix
 
@@ -1223,6 +1799,11 @@ Returns all `SystemSetting` rows as a flat key-value object.
 | Analytics (branches) | ✅ | ✅ | ❌ | ❌ |
 | Analytics (other) | ✅ | ✅ | ✅ (own branch) | ❌ |
 | Reports (all) | ✅ | ✅ | ✅ (own branch) | ❌ |
+| Manager Reports (all) | ✅ | ✅ | ✅ (own branch, same-day edits) | ❌ |
+| Guest Offers (view/create/update/delete) | ✅ | ✅ | ✅ (own branch) | ❌ |
+| Guest Offers (approval) | ✅ | ✅ | ❌ | ❌ |
+| Inventory (categories/items writes) | ✅ | ✅ | ❌ | ❌ |
+| Inventory (statements) | ✅ | ✅ | ✅ (own branch) | ❌ |
 | Settings (GET) | ✅ | ✅ | ✅ | ✅ |
 | Settings (PUT) | ✅ | ❌ | ❌ | ❌ |
 

@@ -15,3 +15,8 @@ export const reportsExcelQuerySchema = z.object({
   startDate: z.string().optional(),
   endDate: z.string().optional(),
 });
+
+export const reportsInventoryExcelQuerySchema = z.object({
+  branchId: z.string().optional(),
+  statementMonth: z.string().optional(),
+});

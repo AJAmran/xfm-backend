@@ -12,6 +12,17 @@ model User {
 
   branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
+  managerReports                  ManagerReport[]
+  approvedManagerReports          ManagerReport[]     @relation("ApprovedManagerReports")
+  managerReportComments           ManagerReportComment[]
+  offeredDiscountLogs             GuestDiscountLog[]   @relation("OfferedDiscountLogs")
+  verifiedDiscountLogs            GuestDiscountLog[]   @relation("VerifiedDiscountLogs")
+  approvedDiscountLogs            GuestDiscountLog[]   @relation("ApprovedDiscountLogs")
+  offeredEntertainmentLogs        GuestEntertainmentLog[] @relation("OfferedEntertainmentLogs")
+  verifiedEntertainmentLogs       GuestEntertainmentLog[] @relation("VerifiedEntertainmentLogs")
+  approvedEntertainmentLogs       GuestEntertainmentLog[] @relation("ApprovedEntertainmentLogs")
+  submittedInventoryStatements    MonthlyInventoryStatement[] @relation("SubmittedInventoryStatements")
+
   @@index([email, role])
   @@index([branchId])
   @@index([isDeleted])

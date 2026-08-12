@@ -1918,7 +1918,602 @@
 			]
 		},
 		{
-			"name": "9. Settings",
+			"name": "9. Manager Reports",
+			"item": [
+				{
+					"name": "✅ List manager reports",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/manager-reports?page=1&limit=10",
+							"host": ["{{BASE_URL}}"],
+							"path": ["manager-reports"],
+							"query": [
+								{ "key": "page", "value": "1" },
+								{ "key": "limit", "value": "10" }
+							]
+						}
+					}
+				},
+				{
+					"name": "✅ Create manager report",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"branchId\": 1,\n  \"managerName\": \"Rahim Uddin\",\n  \"reportDate\": \"2026-08-03\",\n  \"managerComments\": \"Good evening service flow.\",\n  \"supplyPurchaseIssues\": \"Rice stock running low.\",\n  \"briefingPoints\": \"Reinforce table-clearing speed.\",\n  \"dailyLearnings\": \"Large group handled well.\",\n  \"complaints\": [\n    {\n      \"guestName\": \"Tanvir Ahmed\",\n      \"mobile\": \"01711111111\",\n      \"complaintDetails\": \"Serving delay at table 5.\",\n      \"serviceProviderName\": \"Waiter\",\n      \"responsiblePerson\": \"Karim\",\n      \"actionTaken\": \"Apologized and expedited order.\",\n      \"solution\": \"Complimentary dessert provided.\"\n    }\n  ],\n  \"bpCpEntries\": [\n    {\n      \"entryType\": \"TOMORROW\",\n      \"guestName\": \"Nusrat Jahan\",\n      \"mobile\": \"01822222222\",\n      \"comment\": \"VIP booking for tomorrow.\"\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/manager-reports",
+							"host": ["{{BASE_URL}}"],
+							"path": ["manager-reports"]
+						}
+					}
+				},
+				{
+					"name": "✅ Get manager report by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/manager-reports/1",
+							"host": ["{{BASE_URL}}"],
+							"path": ["manager-reports", "1"]
+						}
+					}
+				},
+				{
+					"name": "✅ Update manager report",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"managerComments\": \"Updated comments for the day.\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/manager-reports/1",
+							"host": ["{{BASE_URL}}"],
+							"path": ["manager-reports", "1"]
+						}
+					}
+				},
+				{
+					"name": "✅ Delete manager report (soft)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/manager-reports/1",
+							"host": ["{{BASE_URL}}"],
+							"path": ["manager-reports", "1"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "10. Guest Offers",
+			"item": [
+				{
+					"name": "✅ Offers summary",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/guest-offers/summary",
+							"host": ["{{BASE_URL}}"],
+							"path": ["guest-offers", "summary"]
+						}
+					}
+				},
+				{
+					"name": "✅ List discount logs",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/guest-offers/discounts?page=1&limit=10&approvalStatus=PENDING",
+							"host": ["{{BASE_URL}}"],
+							"path": ["guest-offers", "discounts"],
+							"query": [
+								{ "key": "page", "value": "1" },
+								{ "key": "limit", "value": "10" },
+								{ "key": "approvalStatus", "value": "PENDING" }
+							]
+						}
+					}
+				},
+				{
+					"name": "✅ Create discount log",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"branchId\": 1,\n  \"logDate\": \"2026-08-03\",\n  \"guestName\": \"Sadia Islam\",\n  \"mobile\": \"01933333333\",\n  \"hadLunch\": true,\n  \"hadDinner\": false,\n  \"totalBill\": 5000,\n  \"discountPercent\": 10,\n  \"reasonForDiscount\": \"Returning VIP guest\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/guest-offers/discounts",
+							"host": ["{{BASE_URL}}"],
+							"path": ["guest-offers", "discounts"]
+						}
+					}
+				},
+				{
+					"name": "✅ Approve discount log (admin)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ADMIN_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"approvalStatus\": \"APPROVED\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/guest-offers/discounts/1/approval",
+							"host": ["{{BASE_URL}}"],
+							"path": ["guest-offers", "discounts", "1", "approval"]
+						}
+					}
+				},
+				{
+					"name": "✅ Delete discount log (soft)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/guest-offers/discounts/1",
+							"host": ["{{BASE_URL}}"],
+							"path": ["guest-offers", "discounts", "1"]
+						}
+					}
+				},
+				{
+					"name": "✅ List entertainment logs",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/guest-offers/entertainments?page=1&limit=10",
+							"host": ["{{BASE_URL}}"],
+							"path": ["guest-offers", "entertainments"],
+							"query": [
+								{ "key": "page", "value": "1" },
+								{ "key": "limit", "value": "10" }
+							]
+						}
+					}
+				},
+				{
+					"name": "✅ Create entertainment log",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"branchId\": 1,\n  \"logDate\": \"2026-08-03\",\n  \"guestName\": \"Mehedi Hasan\",\n  \"mobile\": \"01644444444\",\n  \"hadLunch\": false,\n  \"hadDinner\": true,\n  \"foodName\": \"Grilled Salmon\",\n  \"foodCost\": 450,\n  \"reasonForEntertainment\": \"Complaint resolution\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/guest-offers/entertainments",
+							"host": ["{{BASE_URL}}"],
+							"path": ["guest-offers", "entertainments"]
+						}
+					}
+				},
+				{
+					"name": "✅ Reject entertainment log (admin)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ADMIN_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"approvalStatus\": \"REJECTED\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/guest-offers/entertainments/1/approval",
+							"host": ["{{BASE_URL}}"],
+							"path": ["guest-offers", "entertainments", "1", "approval"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "11. Inventory",
+			"item": [
+				{
+					"name": "✅ List categories",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/inventory/categories",
+							"host": ["{{BASE_URL}}"],
+							"path": ["inventory", "categories"]
+						}
+					}
+				},
+				{
+					"name": "✅ Create category (admin)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ADMIN_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Cutlery\",\n  \"sortOrder\": 5,\n  \"isActive\": true\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/inventory/categories",
+							"host": ["{{BASE_URL}}"],
+							"path": ["inventory", "categories"]
+						}
+					}
+				},
+				{
+					"name": "✅ List items",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/inventory/items?limit=100",
+							"host": ["{{BASE_URL}}"],
+							"path": ["inventory", "items"],
+							"query": [
+								{ "key": "limit", "value": "100" }
+							]
+						}
+					}
+				},
+				{
+					"name": "✅ Create item (admin)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ADMIN_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"categoryId\": 1,\n  \"name\": \"Butter Knife\",\n  \"sortOrder\": 1\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/inventory/items",
+							"host": ["{{BASE_URL}}"],
+							"path": ["inventory", "items"]
+						}
+					}
+				},
+				{
+					"name": "✅ List statements",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/inventory/statements?page=1&limit=10",
+							"host": ["{{BASE_URL}}"],
+							"path": ["inventory", "statements"],
+							"query": [
+								{ "key": "page", "value": "1" },
+								{ "key": "limit", "value": "10" }
+							]
+						}
+					}
+				},
+				{
+					"name": "✅ Create statement",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"branchId\": 1,\n  \"statementMonth\": \"2026-08\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/inventory/statements",
+							"host": ["{{BASE_URL}}"],
+							"path": ["inventory", "statements"]
+						}
+					}
+				},
+				{
+					"name": "✅ Get statement lines (grouped)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/inventory/statements/1/lines",
+							"host": ["{{BASE_URL}}"],
+							"path": ["inventory", "statements", "1", "lines"]
+						}
+					}
+				},
+				{
+					"name": "✅ Update statement lines",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"lines\": [\n    { \"itemId\": 1, \"added\": 50, \"brokenLost\": 2, \"reject\": 1 }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/inventory/statements/1/lines",
+							"host": ["{{BASE_URL}}"],
+							"path": ["inventory", "statements", "1", "lines"]
+						}
+					}
+				},
+				{
+					"name": "✅ Submit statement",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"SUBMITTED\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/inventory/statements/1/status",
+							"host": ["{{BASE_URL}}"],
+							"path": ["inventory", "statements", "1", "status"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "12. Reports Module Excel Exports",
+			"item": [
+				{
+					"name": "✅ Export manager reports excel",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/reports/export/excel/manager-reports",
+							"host": ["{{BASE_URL}}"],
+							"path": ["reports", "export", "excel", "manager-reports"]
+						}
+					}
+				},
+				{
+					"name": "✅ Export discount logs excel",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/reports/export/excel/guest-offers/discounts",
+							"host": ["{{BASE_URL}}"],
+							"path": ["reports", "export", "excel", "guest-offers", "discounts"]
+						}
+					}
+				},
+				{
+					"name": "✅ Export entertainment logs excel",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/reports/export/excel/guest-offers/entertainments",
+							"host": ["{{BASE_URL}}"],
+							"path": ["reports", "export", "excel", "guest-offers", "entertainments"]
+						}
+					}
+				},
+				{
+					"name": "✅ Export inventory statement excel",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/reports/export/excel/inventory?statementMonth=2026-08",
+							"host": ["{{BASE_URL}}"],
+							"path": ["reports", "export", "excel", "inventory"],
+							"query": [
+								{ "key": "statementMonth", "value": "2026-08" }
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "13. Dashboard Widgets",
+			"item": [
+				{
+					"name": "✅ Operational widgets",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{ACCESS_TOKEN}}"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/dashboard/operational-widgets",
+							"host": ["{{BASE_URL}}"],
+							"path": ["dashboard", "operational-widgets"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "14. Settings",
 			"item": [
 				{
 					"name": "✅ Get settings (public — no auth)",
@@ -2052,7 +2647,7 @@
 			]
 		},
 		{
-			"name": "10. Edge Cases",
+			"name": "15. Edge Cases",
 			"item": [
 				{
 					"name": "❌ 404 — Unknown route",

@@ -1,0 +1,62 @@
+model GuestDiscountLog {
+  id                Int            @id @default(autoincrement())
+  branchId          Int            @map("branch_id")
+  logDate           DateTime       @map("log_date")
+  guestName         String         @map("guest_name")
+  mobile            String
+  hadLunch          Boolean        @default(false) @map("had_lunch")
+  hadDinner         Boolean        @default(false) @map("had_dinner")
+  totalBill         Decimal        @map("total_bill") @db.Decimal(12, 2)
+  discountPercent   Decimal        @map("discount_percent") @db.Decimal(5, 2)
+  discountAmount    Decimal        @map("discount_amount") @db.Decimal(12, 2)
+  reasonForDiscount String         @map("reason_for_discount") @db.Text
+  offeredByUserId   Int            @map("offered_by_user_id")
+  approvalStatus    ApprovalStatus @default(PENDING) @map("approval_status")
+  verifiedByUserId  Int?           @map("verified_by_user_id")
+  approvedByUserId  Int?           @map("approved_by_user_id")
+  approvedAt        DateTime?      @map("approved_at")
+  isDeleted         Boolean        @default(false) @map("is_deleted")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+
+  branch    Branch @relation(fields: [branchId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  offeredBy User   @relation("OfferedDiscountLogs", fields: [offeredByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  verifiedBy User? @relation("VerifiedDiscountLogs", fields: [verifiedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  approvedBy User? @relation("ApprovedDiscountLogs", fields: [approvedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([branchId, logDate])
+  @@index([approvalStatus])
+  @@index([isDeleted])
+  @@map("guest_discount_logs")
+}
+
+model GuestEntertainmentLog {
+  id                     Int            @id @default(autoincrement())
+  branchId               Int            @map("branch_id")
+  logDate                DateTime       @map("log_date")
+  guestName              String         @map("guest_name")
+  mobile                 String
+  hadLunch               Boolean        @default(false) @map("had_lunch")
+  hadDinner              Boolean        @default(false) @map("had_dinner")
+  foodName               String         @map("food_name")
+  foodCost               Decimal        @map("food_cost") @db.Decimal(12, 2)
+  reasonForEntertainment String         @map("reason_for_entertainment") @db.Text
+  offeredByUserId        Int            @map("offered_by_user_id")
+  approvalStatus         ApprovalStatus @default(PENDING) @map("approval_status")
+  verifiedByUserId       Int?           @map("verified_by_user_id")
+  approvedByUserId       Int?           @map("approved_by_user_id")
+  approvedAt             DateTime?      @map("approved_at")
+  isDeleted              Boolean        @default(false) @map("is_deleted")
+  createdAt              DateTime       @default(now()) @map("created_at")
+  updatedAt              DateTime       @updatedAt @map("updated_at")
+
+  branch    Branch @relation(fields: [branchId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  offeredBy User   @relation("OfferedEntertainmentLogs", fields: [offeredByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  verifiedBy User? @relation("VerifiedEntertainmentLogs", fields: [verifiedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  approvedBy User? @relation("ApprovedEntertainmentLogs", fields: [approvedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([branchId, logDate])
+  @@index([approvalStatus])
+  @@index([isDeleted])
+  @@map("guest_entertainment_logs")
+}

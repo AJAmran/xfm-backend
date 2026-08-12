@@ -22,3 +22,26 @@ enum AgeGroup {
 
   @@map("age_group")
 }
+
+enum BpCpEntryType {
+  TODAY
+  TOMORROW
+
+  @@map("bp_cp_entry_type")
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+
+  @@map("approval_status")
+}
+
+enum InventoryStatementStatus {
+  DRAFT
+  SUBMITTED
+  LOCKED
+
+  @@map("inventory_statement_status")
+}

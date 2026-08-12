@@ -13,5 +13,6 @@ router.get("/summary", validateSchema({ query: dashboardQuerySchema }), dashboar
 router.get("/recent-feedback", validateSchema({ query: dashboardQuerySchema }), dashboardController.recentFeedback);
 router.get("/branch-ranking", authGuard(Role.SUPER_ADMIN, Role.ADMIN), dashboardController.branchRanking);
 router.get("/negative-feedback", validateSchema({ query: dashboardQuerySchema }), dashboardController.negativeFeedback);
+router.get("/operational-widgets", dashboardController.operationalWidgets);
 
 export { router as DashboardRoutes };

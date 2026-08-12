@@ -1,0 +1,71 @@
+model InventoryCategory {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  isDeleted Boolean  @default(false) @map("is_deleted")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  items InventoryItem[]
+
+  @@index([isDeleted])
+  @@map("inventory_categories")
+}
+
+model InventoryItem {
+  id         Int      @id @default(autoincrement())
+  categoryId Int      @map("category_id")
+  name       String
+  sortOrder  Int      @default(0) @map("sort_order")
+  isActive   Boolean  @default(true) @map("is_active")
+  isDeleted  Boolean  @default(false) @map("is_deleted")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  category InventoryCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  lines    MonthlyInventoryLine[]
+
+  @@unique([categoryId, name])
+  @@index([isDeleted])
+  @@map("inventory_items")
+}
+
+model MonthlyInventoryStatement {
+  id                Int                      @id @default(autoincrement())
+  branchId          Int                      @map("branch_id")
+  statementMonth    DateTime                 @map("statement_month")
+  status            InventoryStatementStatus @default(DRAFT)
+  submittedByUserId Int?                     @map("submitted_by_user_id")
+  submittedAt       DateTime?                @map("submitted_at")
+  isDeleted         Boolean                  @default(false) @map("is_deleted")
+  createdAt         DateTime                 @default(now()) @map("created_at")
+  updatedAt         DateTime                 @updatedAt @map("updated_at")
+
+  branch    Branch @relation(fields: [branchId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  submittedBy User? @relation("SubmittedInventoryStatements", fields: [submittedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  lines MonthlyInventoryLine[]
+
+  @@unique([branchId, statementMonth])
+  @@index([isDeleted])
+  @@map("monthly_inventory_statements")
+}
+
+model MonthlyInventoryLine {
+  id           Int @id @default(autoincrement())
+  statementId  Int @map("statement_id")
+  itemId       Int @map("item_id")
+  openingStock Int @default(0) @map("opening_stock")
+  added        Int @default(0)
+  brokenLost   Int @default(0) @map("broken_lost")
+  reject       Int @default(0)
+  closingStock Int @default(0) @map("closing_stock")
+
+  statement MonthlyInventoryStatement @relation(fields: [statementId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  item      InventoryItem             @relation(fields: [itemId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([statementId, itemId])
+  @@index([itemId])
+  @@map("monthly_inventory_lines")
+}
