@@ -54,6 +54,7 @@ export const inventoryLineUpdateSchema = z.object({
   lines: z.array(
     z.object({
       itemId: z.number().int().positive(),
+      openingStock: z.number().int().min(0).optional(),
       added: z.number().int().min(0).optional(),
       brokenLost: z.number().int().min(0).optional(),
       reject: z.number().int().min(0).optional(),
@@ -62,7 +63,12 @@ export const inventoryLineUpdateSchema = z.object({
 }).strict();
 
 export const inventoryStatementStatusSchema = z.object({
-  status: z.enum(["SUBMITTED", "LOCKED"]),
+  status: z.enum(["DRAFT", "SUBMITTED", "LOCKED"]),
+}).strict();
+
+export const inventoryReportQuerySchema = z.object({
+  branchId: z.string().optional(),
+  statementMonth: z.string().optional(),
 }).strict();
 
 export const inventoryIdSchema = z.object({
@@ -78,3 +84,4 @@ export type InventoryStatementQueryInput = z.infer<typeof inventoryStatementQuer
 export type InventoryItemQueryInput = z.infer<typeof inventoryItemQuerySchema>;
 export type InventoryLineUpdateInput = z.infer<typeof inventoryLineUpdateSchema>;
 export type InventoryStatementStatusInput = z.infer<typeof inventoryStatementStatusSchema>;
+export type InventoryReportQueryInput = z.infer<typeof inventoryReportQuerySchema>;

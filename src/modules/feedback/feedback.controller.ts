@@ -11,7 +11,7 @@ export async function submit(req: Request, res: Response) {
 }
 
 export async function getById(req: Request, res: Response) {
-  const feedback = await feedbackService.getFeedbackById(Number(req.params.id));
+  const feedback = await feedbackService.getFeedbackById(Number(req.params.id), req.user!);
   successResponse(res, "Feedback retrieved successfully", feedback);
 }
 

@@ -8,15 +8,52 @@ import {
 } from "../generated/prisma/enums";
 import "dotenv/config";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "node:crypto";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import { PrismaClient } from "../generated/prisma/client";
+import { INVENTORY_CATALOG } from "./inventory-catalog";
 
 // Seed creates its own Prisma instance (separate from the app) so it can be run
 // independently without importing the full app's module graph.
-const adapter = new PrismaMariaDb(process.env.DATABASE_URL!);
+const dbUrl = new URL(process.env.DATABASE_URL!);
+const useSsl =
+  process.env.DATABASE_SSL !== undefined
+    ? process.env.DATABASE_SSL === "true"
+    : dbUrl.searchParams.get("ssl-mode") === "REQUIRED";
+
+const adapter = new PrismaMariaDb({
+  host: dbUrl.hostname,
+  port: dbUrl.port ? Number(dbUrl.port) : 3306,
+  user: decodeURIComponent(dbUrl.username),
+  password: decodeURIComponent(dbUrl.password),
+  database: dbUrl.pathname.slice(1),
+  connectTimeout: 10_000,
+  acquireTimeout: 15_000,
+  minimumIdle: 1,
+  ...(useSsl
+    ? {
+        ssl: {
+          rejectUnauthorized: false,
+        },
+      }
+    : {}),
+});
 const prisma = new PrismaClient({ adapter });
 
 const SALT_ROUNDS = Number(process.env.SALT_ROUNDS) || 12;
+
+function generateStrongPassword(length = 24): string {
+  return randomBytes(length).toString("base64url");
+}
+
+function resolveSeedPassword(envKey: string, label: string): string {
+  const fromEnv = process.env[envKey];
+  if (fromEnv) return fromEnv;
+  const generated = generateStrongPassword();
+  console.warn(`  ⚠ ${envKey} not set — using a generated password for ${label}. Set ${envKey} to pin it.`);
+  console.log(`    ${label} login → password: ${generated}`);
+  return generated;
+}
 
 // ─── Static data ──────────────────────────────────────────────────────────────
 const BRANCHES = [
@@ -26,7 +63,7 @@ const BRANCHES = [
     address: "212 New Elephant Road, Dhaka-1205",
     phone: ["01329661662"],
     latitude: 23.740042879559585,
-    longitude: 990.38950769940561,
+    longitude: 90.38950769940561,
   },
   {
     code: "X-02",
@@ -154,91 +191,76 @@ const BRANCH_MANAGERS = [
     code: "X-01",
     name: "Xian Restaurant Manager",
     email: "xian@x-grouprestaurant.com",
-    password: "Xian@123",
   },
   {
     code: "X-02",
     name: "Xenial Restaurant Manager",
     email: "xenial@x-grouprestaurant.com",
-    password: "Xenial@123",
   },
   {
     code: "X-03",
     name: "Xiamen Restaurant Manager",
     email: "xiamen@x-grouprestaurant.com",
-    password: "Xiamen@123",
   },
   {
     code: "X-04",
     name: "Golden Chimney Restaurant Manager",
     email: "golden.chm@x-grouprestaurant.com",
-    password: "Golden@123",
   },
   {
     code: "X-05",
     name: "Xindian Restaurant Manager",
     email: "xindian@x-grouprestaurant.com",
-    password: "Xindian@123",
   },
   {
     code: "X-06",
     name: "Xinxian Restaurant, Dhanmondi Manager",
     email: "xinxian.dhan@x-grouprestaurant.com",
-    password: "Dhanmondi@123",
   },
   {
     code: "X-07",
     name: "Four Seasons Restaurant, Dhanmondi Manager",
     email: "4seasons@x-grouprestaurant.com",
-    password: "FourDhan@123",
   },
   {
     code: "X-08",
     name: "Xinxian Restaurant, Mirpur-10 Manager",
     email: "xinxian.mirpur@x-grouprestaurant.com",
-    password: "Mirpur10@123",
   },
   {
     code: "X-09",
     name: "Chung Wah Restaurant Manager",
     email: "chungwah@x-grouprestaurant.com",
-    password: "ChungWah@123",
   },
   {
     code: "X-11",
     name: "Xinxian Restaurant, Uttara Manager",
     email: "xinxian.uttara@x-grouprestaurant.com",
-    password: "Uttara@123",
   },
   {
     code: "X-12",
     name: "Shimanto Convention Center Manager",
     email: "shimanto@x-grouprestaurant.com",
-    password: "Shimanto@123",
   },
   {
     code: "X-16",
     name: "Xinxian Restaurant, Mirpur-01 Manager",
     email: "xinxian.mirpur1@x-grouprestaurant.com",
-    password: "Mirpur01@123",
   },
   {
     code: "X-17",
     name: "Zam Zam Convention Center, Mirpur-01 Manager",
     email: "zamzam@x-grouprestaurant.com",
-    password: "ZamZam01@123",
   },
   {
     code: "X-18",
     name: "Zam Zam Convention Center, Mirpur-11 Manager",
     email: "zamzam.mirpur@x-grouprestaurant.com",
-    password: "ZamZam11@123",
   },
   {
     code: "X-19",
     name: "Four Seasons Restaurant, Mirpur-11 Manager",
     email: "4season@x-grouprestaurant.com",
-    password: "Four11@123",
   },
 ];
 
@@ -431,6 +453,12 @@ function createFeedbackId(branchCode: string, date: Date): string {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_PRODUCTION_SEED !== "true") {
+    throw new Error(
+      "Refusing to seed in production — this script wipes existing data. " +
+        "Set ALLOW_PRODUCTION_SEED=true to override.",
+    );
+  }
   console.log("🌱 Seeding database...\n");
 
   await prisma.$transaction([
@@ -474,12 +502,19 @@ async function main() {
     console.log(`      ${b.code} — ${b.name}`),
   );
 
-  const superAdminPw = await bcrypt.hash("SuperAdmin@123", SALT_ROUNDS);
-  const adminPw = await bcrypt.hash("Admin@123", SALT_ROUNDS);
+  const superAdminPw = await bcrypt.hash(
+    resolveSeedPassword("SEED_SUPER_ADMIN_PASSWORD", "Super Admin"),
+    SALT_ROUNDS,
+  );
+  const adminPw = await bcrypt.hash(
+    resolveSeedPassword("SEED_ADMIN_PASSWORD", "Admin"),
+    SALT_ROUNDS,
+  );
+  const managerPassword = resolveSeedPassword("SEED_MANAGER_PASSWORD", "Branch Managers");
 
   const managerHashPromises = BRANCH_MANAGERS.map(async (m) => ({
     ...m,
-    hashedPassword: await bcrypt.hash(m.password, SALT_ROUNDS),
+    hashedPassword: await bcrypt.hash(managerPassword, SALT_ROUNDS),
   }));
   const managersWithHashes = await Promise.all(managerHashPromises);
 
@@ -562,62 +597,19 @@ async function main() {
   console.log("  ✓ Settings: defaults created");
 
   // ─── Inventory master data (seed categories & items from the paper form) ───
-  const CHINAWARE_ITEMS = [
-    "Rice dish",
-    "Service plate",
-    "Dinner plate Round",
-    "Dinner Plate Square",
-    "Soup liner",
-    "Small soup bowl",
-    "Big soup bowl",
-    "Table soup cup",
-    "BBQ Plate",
-    "Sauce set",
-    "Salt & pepper set",
-    "Soya sauce bottle",
-    "Tea cup",
-    "Tea pot",
-    "Sugar pot",
-    "Sugar Bowl",
-    "Milk pot",
-    "Ice cream cup",
-    "Tea saucer",
-    "Sauce Bowl",
-    "Flower vase",
-    "Finger bowl",
-    "Toothpick Holder",
-  ];
-  const GLASSWARE_ITEMS = [
-    "Tumbler",
-    "Water glass",
-    "Highball glass",
-    "Shot glass",
-  ];
-
-  const chinaware = await prisma.inventoryCategory.create({
-    data: { name: "Chinaware", sortOrder: 1 },
-  });
-  const glassware = await prisma.inventoryCategory.create({
-    data: { name: "Glassware", sortOrder: 2 },
-  });
-
-  await prisma.inventoryItem.createMany({
-    data: [
-      ...CHINAWARE_ITEMS.map((name, i) => ({
-        categoryId: chinaware.id,
+  for (const category of INVENTORY_CATALOG) {
+    const created = await prisma.inventoryCategory.create({
+      data: { name: category.name, sortOrder: category.sortOrder },
+    });
+    await prisma.inventoryItem.createMany({
+      data: category.items.map((name, i) => ({
+        categoryId: created.id,
         name,
         sortOrder: i + 1,
       })),
-      ...GLASSWARE_ITEMS.map((name, i) => ({
-        categoryId: glassware.id,
-        name,
-        sortOrder: i + 1,
-      })),
-    ],
-  });
-  console.log(
-    `  ✓ Inventory: ${chinaware.name} (${CHINAWARE_ITEMS.length} items) + ${glassware.name} (${GLASSWARE_ITEMS.length} items)`,
-  );
+    });
+    console.log(`  ✓ Inventory: ${category.name} (${category.items.length} items)`);
+  }
 
   // ─── Sample records for the new operational modules ─────────────────────────
   const managers = await prisma.user.findMany({

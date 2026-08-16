@@ -6,7 +6,7 @@ import compression from "compression";
 import env from "./config/env";
 import { requestLogger } from "./middleware/logger";
 import { globalErrorHandler } from "./middleware/errorHandler";
-// import { globalLimiter } from "./middleware/rateLimiter";
+import { globalLimiter } from "./middleware/rateLimiter";
 import { prisma } from "./lib/prisma";
 import { AuthRoutes } from "./modules/auth/auth.route";
 import { UserRoutes } from "./modules/user/user.routes";
@@ -19,8 +19,13 @@ import { SettingsRoutes } from "./modules/settings/settings.routes";
 import { ManagerReportRoutes } from "./modules/manager-report/manager-report.routes";
 import { GuestOfferRoutes } from "./modules/guest-offer/guest-offer.routes";
 import { InventoryRoutes } from "./modules/inventory/inventory.routes";
+import { RealtimeRoutes } from "./modules/realtime/realtime.routes";
 
 const app: Application = express();
+
+// Trust the first hop when deployed behind a reverse proxy (Vercel/nginx/PM2).
+// Required so express-rate-limit keys off the real client IP, not the proxy's.
+app.set("trust proxy", 1);
 
 app.use(helmet());
 
@@ -39,14 +44,25 @@ app.use(
 );
 
 app.use(cookieParser());
-app.use(express.json({ limit: "10kb" }));
-app.use(express.urlencoded({ extended: true, limit: "10kb" }));
+// 1mb body limit: feedback payloads are tiny, but inventory statements and
+// manager reports legitimately ship many rows/lines in one request.
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
-app.use(compression());
+app.use(compression({ filter: shouldCompress }));
+
+/** Disable gzip for streaming routes (SSE must stream uncompressed). */
+function shouldCompress(_req: Request, res: Response) {
+  if (res.getHeader("Content-Type") === "text/event-stream") return false;
+  return true;
+}
 
 app.use(requestLogger);
 
-// app.use(globalLimiter);
+// Baseline distributed throttling: one velvet-rope for the whole API.
+// SSE streams count once per connection (not per event), so realtime sync
+// is unaffected; dashboard polling and bulk exports stay well under the cap.
+app.use(globalLimiter);
 
 app.get("/api/v1/health", async (_req: Request, res: Response) => {
   let dbStatus = "unhealthy";
@@ -90,6 +106,7 @@ app.use(`${v1}/settings`, SettingsRoutes);
 app.use(`${v1}/manager-reports`, ManagerReportRoutes);
 app.use(`${v1}/guest-offers`, GuestOfferRoutes);
 app.use(`${v1}/inventory`, InventoryRoutes);
+app.use(`${v1}/realtime`, RealtimeRoutes);
 
 app.use(globalErrorHandler);
 

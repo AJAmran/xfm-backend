@@ -4,6 +4,7 @@ import { prisma } from "../../lib/prisma";
 import { appError } from "../../utils/appError";
 import { transformPagination, buildMetadata } from "../../utils/queryBuilder";
 import { formatDateOnly, toDateOnly, toEndOfDay, getTodayString, getYesterdayString } from "../../utils/dateHelpers";
+import { publishDataChanged } from "../../lib/realtime";
 import {
   CreateManagerReportInput,
   UpdateManagerReportInput,
@@ -79,6 +80,7 @@ export async function createReport(payload: CreateManagerReportInput, user: Auth
     entryType: e.entryType,
     guestName: e.guestName,
     mobile: e.mobile,
+    totalPax: e.totalPax ?? null,
     comment: e.comment ?? null,
   }));
 
@@ -112,6 +114,7 @@ export async function createReport(payload: CreateManagerReportInput, user: Auth
         include: REPORT_INCLUDE,
       }),
     );
+    publishDataChanged("manager-report.created", { type: "branch", branchId });
     return formatReport(report);
   }
 
@@ -122,6 +125,7 @@ export async function createReport(payload: CreateManagerReportInput, user: Auth
     }),
   );
 
+  publishDataChanged("manager-report.created", { type: "branch", branchId });
   return formatReport(report);
 }
 
@@ -245,6 +249,7 @@ export async function updateReport(id: number, payload: UpdateManagerReportInput
         entryType: e.entryType,
         guestName: e.guestName,
         mobile: e.mobile,
+        totalPax: e.totalPax ?? null,
         comment: e.comment ?? null,
       })),
     };
@@ -261,6 +266,7 @@ export async function updateReport(id: number, payload: UpdateManagerReportInput
     tx.managerReport.update({ where: { id }, data, include: REPORT_INCLUDE }),
   );
 
+  publishDataChanged("manager-report.updated", { type: "branch", branchId: existing.branchId });
   return formatReport(report);
 }
 
@@ -278,13 +284,18 @@ export async function deleteReport(id: number, user: AuthUser) {
       throw appError("Approved reports cannot be deleted", httpStatus.CONFLICT);
     }
   }
-  return prisma.managerReport.update({ where: { id }, data: { isDeleted: true } });
+  const report = await prisma.managerReport.update({
+    where: { id },
+    data: { isDeleted: true },
+  });
+  publishDataChanged("manager-report.deleted", { type: "branch", branchId: existing.branchId });
+  return report;
 }
 
 export async function setReportApproval(id: number, payload: ApprovalStatusInput, user: AuthUser) {
   const existing = await prisma.managerReport.findUnique({
     where: { id },
-    select: { approvalStatus: true, isDeleted: true },
+    select: { approvalStatus: true, isDeleted: true, branchId: true },
   });
   if (!existing || existing.isDeleted) throw appError("Manager report not found", httpStatus.NOT_FOUND);
   if (existing.approvalStatus === "APPROVED") throw appError("This report is already approved", httpStatus.CONFLICT);
@@ -300,6 +311,7 @@ export async function setReportApproval(id: number, payload: ApprovalStatusInput
     include: REPORT_INCLUDE,
   });
 
+  publishDataChanged("manager-report.approved", { type: "branch", branchId: existing.branchId });
   return formatReport(report);
 }
 
@@ -323,12 +335,14 @@ export async function getReportComments(id: number, user: AuthUser) {
 export async function addReportComment(id: number, payload: CreateManagerReportCommentInput, user: AuthUser) {
   const report = await prisma.managerReport.findUnique({
     where: { id },
-    select: { isDeleted: true },
+    select: { isDeleted: true, branchId: true },
   });
   if (!report || report.isDeleted) throw appError("Manager report not found", httpStatus.NOT_FOUND);
 
-  return prisma.managerReportComment.create({
+  const comment = await prisma.managerReportComment.create({
     data: { reportId: id, userId: user.id, comment: payload.comment },
     include: { user: { select: { id: true, name: true, role: true } } },
   });
+  publishDataChanged("manager-report.commented", { type: "branch", branchId: report.branchId });
+  return comment;
 }

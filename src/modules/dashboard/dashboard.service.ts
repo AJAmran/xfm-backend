@@ -2,47 +2,53 @@ import { Prisma } from "../../../generated/prisma/client";
 import { prisma } from "../../lib/prisma";
 import { buildFeedbackWhere, getRatingStats, getNegativeCount } from "../../utils/feedbackAggregation";
 import { toDateOnly, toEndOfDay, toMonthStart, toNextMonthStart } from "../../utils/dateHelpers";
+import { withCache } from "../../lib/cache";
 
 export async function getOperationalWidgets(branchId?: number) {
-  const nowIso = new Date().toISOString();
-  const dayKey = nowIso.slice(0, 10);
-  const todayStart = toDateOnly(dayKey);
-  const todayEnd = toEndOfDay(dayKey);
-  const monthKey = nowIso.slice(0, 7);
-  const monthStart = toMonthStart(monthKey);
-  const monthEnd = toNextMonthStart(monthKey);
+  // Short-lived cache (30s): the widgets are re-fetched on every dashboard
+  // render + every realtime refresh, so coalescing them avoids 4 round-trips
+  // per refresh while still staying fresh enough for ops monitoring.
+  return withCache(`opWidgets_${branchId || "all"}`, async () => {
+    const nowIso = new Date().toISOString();
+    const dayKey = nowIso.slice(0, 10);
+    const todayStart = toDateOnly(dayKey);
+    const todayEnd = toEndOfDay(dayKey);
+    const monthKey = nowIso.slice(0, 7);
+    const monthStart = toMonthStart(monthKey);
+    const monthEnd = toNextMonthStart(monthKey);
 
-  const scope: { branchId?: number } = {};
-  if (branchId) scope.branchId = branchId;
+    const scope: { branchId?: number } = {};
+    if (branchId) scope.branchId = branchId;
 
-  const [pendingDiscounts, pendingEntertainment, reportsToday, inventoryStatements] = await Promise.all([
-    prisma.guestDiscountLog.count({ where: { ...scope, approvalStatus: "PENDING", isDeleted: false } }),
-    prisma.guestEntertainmentLog.count({ where: { ...scope, approvalStatus: "PENDING", isDeleted: false } }),
-    prisma.managerReport.count({
-      where: { isDeleted: false, reportDate: { gte: todayStart, lte: todayEnd }, ...(branchId ? { branchId } : {}) },
-    }),
-    prisma.monthlyInventoryStatement.findMany({
-      where: { isDeleted: false, statementMonth: { gte: monthStart, lt: monthEnd }, ...(branchId ? { branchId } : {}) },
-      select: { status: true },
-    }),
-  ]);
+    const [pendingDiscounts, pendingEntertainment, reportsToday, inventoryStatements] = await Promise.all([
+      prisma.guestDiscountLog.count({ where: { ...scope, approvalStatus: "PENDING", isDeleted: false } }),
+      prisma.guestEntertainmentLog.count({ where: { ...scope, approvalStatus: "PENDING", isDeleted: false } }),
+      prisma.managerReport.count({
+        where: { isDeleted: false, reportDate: { gte: todayStart, lte: todayEnd }, ...(branchId ? { branchId } : {}) },
+      }),
+      prisma.monthlyInventoryStatement.findMany({
+        where: { isDeleted: false, statementMonth: { gte: monthStart, lt: monthEnd }, ...(branchId ? { branchId } : {}) },
+        select: { status: true },
+      }),
+    ]);
 
-  const inventorySubmitted = inventoryStatements.filter((s) => s.status === "SUBMITTED").length;
-  const inventoryDraft = inventoryStatements.filter((s) => s.status === "DRAFT").length;
+    const inventorySubmitted = inventoryStatements.filter((s) => s.status === "SUBMITTED").length;
+    const inventoryDraft = inventoryStatements.filter((s) => s.status === "DRAFT").length;
 
-  return {
-    pendingApprovals: {
-      total: pendingDiscounts + pendingEntertainment,
-      discounts: pendingDiscounts,
-      entertainments: pendingEntertainment,
-    },
-    managerReportsSubmittedToday: reportsToday,
-    inventoryThisMonth: {
-      submitted: inventorySubmitted,
-      draft: inventoryDraft,
-      branchesWithStatement: inventoryStatements.length,
-    },
-  };
+    return {
+      pendingApprovals: {
+        total: pendingDiscounts + pendingEntertainment,
+        discounts: pendingDiscounts,
+        entertainments: pendingEntertainment,
+      },
+      managerReportsSubmittedToday: reportsToday,
+      inventoryThisMonth: {
+        submitted: inventorySubmitted,
+        draft: inventoryDraft,
+        branchesWithStatement: inventoryStatements.length,
+      },
+    };
+  }, 30);
 }
 
 export async function getSummary(branchId?: number, startDate?: string, endDate?: string) {

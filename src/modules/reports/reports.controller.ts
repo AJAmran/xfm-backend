@@ -2,27 +2,36 @@ import httpStatus from "http-status";
 import { Request, Response } from "express";
 import * as reportsService from "./reports.service";
 import { successResponse } from "../../utils/apiResponse";
+import { appError } from "../../utils/appError";
+
+function resolveBranchId(req: Request): number | undefined {
+  if (req.user?.role === "BRANCH_MANAGER") return req.user.branchId ?? undefined;
+  return req.query.branchId ? Number(req.query.branchId) : undefined;
+}
 
 export async function daily(req: Request, res: Response) {
-  const branchId = req.user?.role === "BRANCH_MANAGER" ? req.user.branchId ?? undefined : undefined;
+  const branchId = resolveBranchId(req);
   const data = await reportsService.getDailyReport(branchId);
   successResponse(res, "Daily report retrieved successfully", data);
 }
 
 export async function weekly(req: Request, res: Response) {
-  const branchId = req.user?.role === "BRANCH_MANAGER" ? req.user.branchId ?? undefined : undefined;
+  const branchId = resolveBranchId(req);
   const data = await reportsService.getWeeklyReport(branchId);
   successResponse(res, "Weekly report retrieved successfully", data);
 }
 
 export async function monthly(req: Request, res: Response) {
-  const branchId = req.user?.role === "BRANCH_MANAGER" ? req.user.branchId ?? undefined : undefined;
+  const branchId = resolveBranchId(req);
   const data = await reportsService.getMonthlyReport(branchId);
   successResponse(res, "Monthly report retrieved successfully", data);
 }
 
 export async function branch(req: Request, res: Response) {
-  const branchId = req.user?.role === "BRANCH_MANAGER" ? req.user.branchId! : Number(req.query.branchId);
+  const branchId = resolveBranchId(req);
+  if (!branchId) {
+    throw appError("branchId query parameter is required", httpStatus.BAD_REQUEST);
+  }
   const data = await reportsService.getBranchReport(branchId);
   successResponse(res, "Branch report retrieved successfully", data);
 }

@@ -7,6 +7,7 @@ model User {
   role      Role
   isActive  Boolean  @default(true) @map("is_active")
   isDeleted Boolean  @default(false) @map("is_deleted")
+  tokenVersion Int  @default(0) @map("token_version")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

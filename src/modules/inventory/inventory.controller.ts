@@ -3,7 +3,7 @@ import httpStatus from "http-status";
 import * as inventoryService from "./inventory.service";
 import { successResponse } from "../../utils/apiResponse";
 import { parsedQuery } from "../../middleware/validation";
-import { InventoryStatementQueryInput, InventoryItemQueryInput } from "./inventory.validation";
+import { InventoryStatementQueryInput, InventoryItemQueryInput, InventoryReportQueryInput } from "./inventory.validation";
 
 // ─── Categories ───────────────────────────────────────────────────────────────
 
@@ -81,4 +81,12 @@ export async function updateStatementLines(req: Request, res: Response) {
 export async function updateStatementStatus(req: Request, res: Response) {
   const statement = await inventoryService.updateStatementStatus(Number(req.params.id), req.body, req.user!);
   successResponse(res, "Inventory statement status updated successfully", statement);
+}
+
+// ─── Report ───────────────────────────────────────────────────────────────────
+
+export async function getInventoryReport(req: Request, res: Response) {
+  const query = parsedQuery<InventoryReportQueryInput>(res);
+  const report = await inventoryService.getInventoryReport(query, req.user!);
+  successResponse(res, "Inventory report retrieved successfully", report);
 }

@@ -11,6 +11,7 @@
     "start": "node dist/server.js",
     "build": "tsup src/server.ts --format cjs --clean",
     "seed": "npx tsx prisma/seed.ts",
+    "seed:inventory": "npx tsx prisma/seed-inventory-catalog.ts",
     "postinstall": "prisma generate",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -30,6 +31,7 @@
     "express-rate-limit": "^8.5.2",
     "helmet": "^8.1.0",
     "http-status": "^2.1.0",
+    "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.3",
     "node-cache": "^5.1.2",
     "pino": "^10.3.1",

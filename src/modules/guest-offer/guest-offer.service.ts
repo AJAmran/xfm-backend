@@ -5,6 +5,7 @@ import { appError } from "../../utils/appError";
 import { transformPagination, buildMetadata } from "../../utils/queryBuilder";
 import { formatDateOnly, toDateOnly, toEndOfDay } from "../../utils/dateHelpers";
 import { resolveBranchScope, roundMoney } from "../../utils/accessScope";
+import { publishDataChanged } from "../../lib/realtime";
 import {
   GuestDiscountCreateInput,
   GuestDiscountUpdateInput,
@@ -73,6 +74,7 @@ export async function createDiscountLog(payload: GuestDiscountCreateInput, user:
     },
   });
 
+  publishDataChanged("guest-offer.discount-created", { type: "branch", branchId });
   return formatLog(log);
 }
 
@@ -137,11 +139,12 @@ export async function updateDiscountLog(id: number, payload: GuestDiscountUpdate
     data,
     include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } } },
   });
+  publishDataChanged("guest-offer.discount-updated", { type: "branch", branchId: existing.branchId });
   return formatLog(log);
 }
 
 export async function setDiscountLogApproval(id: number, payload: ApprovalStatusInput, user: AuthUser) {
-  const existing = await prisma.guestDiscountLog.findUnique({ where: { id }, select: { approvalStatus: true, isDeleted: true } });
+  const existing = await prisma.guestDiscountLog.findUnique({ where: { id }, select: { approvalStatus: true, isDeleted: true, branchId: true } });
   if (!existing || existing.isDeleted) throw appError("Discount log not found", httpStatus.NOT_FOUND);
   if (existing.approvalStatus === "APPROVED") throw appError("This log is already approved", httpStatus.CONFLICT);
 
@@ -155,6 +158,7 @@ export async function setDiscountLogApproval(id: number, payload: ApprovalStatus
     },
     include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } } },
   });
+  publishDataChanged("guest-offer.discount-approved", { type: "branch", branchId: existing.branchId });
   return formatLog(log);
 }
 
@@ -162,7 +166,9 @@ export async function deleteDiscountLog(id: number, user: AuthUser) {
   const existing = await prisma.guestDiscountLog.findUnique({ where: { id }, select: { branchId: true, isDeleted: true } });
   if (!existing || existing.isDeleted) throw appError("Discount log not found", httpStatus.NOT_FOUND);
   if (isManager(user) && existing.branchId !== user.branchId) throw appError("Forbidden: own branch only", httpStatus.FORBIDDEN);
-  return prisma.guestDiscountLog.update({ where: { id }, data: { isDeleted: true } });
+  const log = await prisma.guestDiscountLog.update({ where: { id }, data: { isDeleted: true } });
+  publishDataChanged("guest-offer.discount-deleted", { type: "branch", branchId: existing.branchId });
+  return log;
 }
 
 // ─── Entertainment logs ───────────────────────────────────────────────────────
@@ -189,6 +195,7 @@ export async function createEntertainmentLog(payload: GuestEntertainmentCreateIn
     },
   });
 
+  publishDataChanged("guest-offer.entertainment-created", { type: "branch", branchId });
   return formatLog(log);
 }
 
@@ -248,11 +255,12 @@ export async function updateEntertainmentLog(id: number, payload: GuestEntertain
     data,
     include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } } },
   });
+  publishDataChanged("guest-offer.entertainment-updated", { type: "branch", branchId: existing.branchId });
   return formatLog(log);
 }
 
 export async function setEntertainmentLogApproval(id: number, payload: ApprovalStatusInput, user: AuthUser) {
-  const existing = await prisma.guestEntertainmentLog.findUnique({ where: { id }, select: { approvalStatus: true, isDeleted: true } });
+  const existing = await prisma.guestEntertainmentLog.findUnique({ where: { id }, select: { approvalStatus: true, isDeleted: true, branchId: true } });
   if (!existing || existing.isDeleted) throw appError("Entertainment log not found", httpStatus.NOT_FOUND);
   if (existing.approvalStatus === "APPROVED") throw appError("This log is already approved", httpStatus.CONFLICT);
 
@@ -266,6 +274,7 @@ export async function setEntertainmentLogApproval(id: number, payload: ApprovalS
     },
     include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } } },
   });
+  publishDataChanged("guest-offer.entertainment-approved", { type: "branch", branchId: existing.branchId });
   return formatLog(log);
 }
 
@@ -273,7 +282,9 @@ export async function deleteEntertainmentLog(id: number, user: AuthUser) {
   const existing = await prisma.guestEntertainmentLog.findUnique({ where: { id }, select: { branchId: true, isDeleted: true } });
   if (!existing || existing.isDeleted) throw appError("Entertainment log not found", httpStatus.NOT_FOUND);
   if (isManager(user) && existing.branchId !== user.branchId) throw appError("Forbidden: own branch only", httpStatus.FORBIDDEN);
-  return prisma.guestEntertainmentLog.update({ where: { id }, data: { isDeleted: true } });
+  const log = await prisma.guestEntertainmentLog.update({ where: { id }, data: { isDeleted: true } });
+  publishDataChanged("guest-offer.entertainment-deleted", { type: "branch", branchId: existing.branchId });
+  return log;
 }
 
 // ─── Daily summary ────────────────────────────────────────────────────────────

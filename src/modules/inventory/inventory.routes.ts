@@ -14,6 +14,7 @@ import {
   inventoryLineUpdateSchema,
   inventoryStatementStatusSchema,
   inventoryIdSchema,
+  inventoryReportQuerySchema,
 } from "./inventory.validation";
 
 const router = Router();
@@ -38,5 +39,8 @@ router.get("/statements/:id", validateSchema({ params: inventoryIdSchema }), inv
 router.get("/statements/:id/lines", validateSchema({ params: inventoryIdSchema }), inventoryController.getStatementLines);
 router.patch("/statements/:id/lines", validateSchema({ params: inventoryIdSchema, body: inventoryLineUpdateSchema }), inventoryController.updateStatementLines);
 router.patch("/statements/:id/status", validateSchema({ params: inventoryIdSchema, body: inventoryStatementStatusSchema }), inventoryController.updateStatementStatus);
+
+// Report
+router.get("/report", validateSchema({ query: inventoryReportQuerySchema }), inventoryController.getInventoryReport);
 
 export { router as InventoryRoutes };

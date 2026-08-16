@@ -19,7 +19,10 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(1, "JWT_REFRESH_SECRET is required"),
   JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
   JWT_REFRESH_EXPIRES_IN: z.string().default("7d"),
-  SALT_ROUNDS: z.coerce.number().positive().default(12),
+  SALT_ROUNDS: z.coerce.number().positive().default(10),
+  // Optional Redis URL for the shared analytics/session cache. Omit or leave
+  // empty to fall back to the in-process NodeCache (fine for a single instance).
+  REDIS_URL: z.string().optional(),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   REPORT_EXPORT_LIMIT: z.coerce.number().positive().default(5000),
   REPORT_FETCH_LIMIT: z.coerce.number().positive().default(1000),
@@ -48,4 +51,5 @@ export default {
   node_env: env.NODE_ENV,
   report_export_limit: env.REPORT_EXPORT_LIMIT,
   report_fetch_limit: env.REPORT_FETCH_LIMIT,
+  redis_url: env.REDIS_URL,
 };

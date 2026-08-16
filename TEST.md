@@ -2,13 +2,15 @@
 
 **Base URL:** `http://localhost:5000/api/v1`
 
-**After running `npm run seed`, use these test credentials:**
+**After running `npm run seed`, the seeded account passwords come from these env vars:**
 
 | Role | Email | Password |
 |------|-------|----------|
-| SUPER_ADMIN | superadmin@x-grouprestaurant.com | SuperAdmin@123 |
-| ADMIN | admin@x-grouprestaurant.com | Admin@123 |
-| BRANCH_MANAGER | xian@x-grouprestaurant.com | Xian@123 |
+| SUPER_ADMIN | superadmin@x-grouprestaurant.com | `SEED_SUPER_ADMIN_PASSWORD` |
+| ADMIN | admin@x-grouprestaurant.com | `SEED_ADMIN_PASSWORD` |
+| BRANCH_MANAGER | xian@x-grouprestaurant.com | `SEED_MANAGER_PASSWORD` |
+
+If a `SEED_*` var is not set, the seed generates a random password and prints it to the console. In production, the seed refuses to run unless `ALLOW_PRODUCTION_SEED=true`.
 
 ---
 
@@ -50,7 +52,7 @@ After login, copy the `accessToken` from the response and add `Authorization: Be
 ```json
 {
   "email": "superadmin@x-grouprestaurant.com",
-  "password": "SuperAdmin@123"
+  "password": "$SEED_SUPER_ADMIN_PASSWORD"
 }
 ```
 
@@ -58,7 +60,7 @@ After login, copy the `accessToken` from the response and add `Authorization: Be
 ```json
 {
   "email": "admin@x-grouprestaurant.com",
-  "password": "Admin@123"
+  "password": "$SEED_ADMIN_PASSWORD"
 }
 ```
 
@@ -66,7 +68,7 @@ After login, copy the `accessToken` from the response and add `Authorization: Be
 ```json
 {
   "email": "xian@x-grouprestaurant.com",
-  "password": "Xian@123"
+  "password": "$SEED_MANAGER_PASSWORD"
 }
 ```
 
@@ -75,7 +77,7 @@ After login, copy the `accessToken` from the response and add `Authorization: Be
 | Test | Payload | Expected Status |
 |------|---------|-----------------|
 | Wrong password | `{ "email": "xian@x-grouprestaurant.com", "password": "WrongPassword" }` | **401** |
-| Email not found | `{ "email": "noone@test.com", "password": "Admin@123" }` | **404** |
+| Email not found | `{ "email": "noone@test.com", "password": "SomePassword" }` | **404** |
 | Invalid email + short password | `{ "email": "bad", "password": "short" }` | **422** |
 | Empty body | `{}` | **422** |
 | No auth header | _(GET /auth/me with no Bearer)_ | **401** |

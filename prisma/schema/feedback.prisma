@@ -1,6 +1,6 @@
 model GuestFeedback {
   id         Int      @id @default(autoincrement())
-  feedbackId String?  @map("feedback_id")
+  feedbackId String?  @unique @map("feedback_id")
   branchId   Int      @map("branch_id")
   guestName  String   @map("guest_name")
   contact    String
@@ -16,7 +16,6 @@ model GuestFeedback {
 
   branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
-  @@index([feedbackId])
   @@index([branchId])
   @@index([submittedAt])
   @@index([overallRating])

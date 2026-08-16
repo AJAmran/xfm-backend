@@ -10,12 +10,19 @@ async function getFeedbacksInRange(start: Date, end: Date, branchId?: number) {
   const where: Prisma.GuestFeedbackWhereInput = { submittedAt: { gte: start, lte: end } };
   if (branchId) where.branchId = branchId;
 
-  return prisma.guestFeedback.findMany({
-    where,
-    include: { branch: { select: { name: true, code: true } } },
-    orderBy: { submittedAt: "desc" },
-    take: env.report_fetch_limit,
-  });
+  // Branch display data fetched once in parallel and mapped in JS: an `include`
+  // would add a second serialized DB round-trip on high-latency links.
+  const [feedbacks, branches] = await Promise.all([
+    prisma.guestFeedback.findMany({
+      where,
+      orderBy: { submittedAt: "desc" },
+      take: env.report_fetch_limit,
+    }),
+    prisma.branch.findMany({ where: { isDeleted: false }, select: { id: true, name: true, code: true } }),
+  ]);
+
+  const branchMap = new Map(branches.map((b) => [b.id, { name: b.name, code: b.code }]));
+  return feedbacks.map((f) => ({ ...f, branch: branchMap.get(f.branchId) ?? null }));
 }
 
 async function getPeriodSummary(start: Date, end: Date, branchId?: number) {

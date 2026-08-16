@@ -22,10 +22,13 @@ if (!globalForPrisma.prisma) {
     user: decodeURIComponent(dbUrl.username),
     password: decodeURIComponent(dbUrl.password),
     database: dbUrl.pathname.slice(1),
-    connectionLimit: 5,
+    connectionLimit: 15,
     connectTimeout: 10_000,
     acquireTimeout: 15_000,
-    minimumIdle: 1,
+    // Keep a warm set of pooled connections so parallel analytics/report
+    // query bursts (the dashboard fires up to ~10 concurrent queries) don't
+    // stall on remote TLS handshakes (~1s each to Aiven).
+    minimumIdle: 10,
     ...(useSsl
       ? {
           ssl: {

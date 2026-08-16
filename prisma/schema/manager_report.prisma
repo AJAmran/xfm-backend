@@ -55,6 +55,7 @@ model BpCpEntry {
   entryType       BpCpEntryType @map("entry_type")
   guestName       String        @map("guest_name")
   mobile          String
+  totalPax        Int?          @map("total_pax")
   comment         String?       @db.Text
 
   managerReport ManagerReport @relation(fields: [managerReportId], references: [id], onDelete: Cascade, onUpdate: Cascade)

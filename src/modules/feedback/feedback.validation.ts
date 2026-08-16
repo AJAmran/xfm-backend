@@ -30,5 +30,9 @@ export const feedbackQuerySchema = z.object({
   search: z.string().optional(),
 });
 
+export const feedbackIdParamSchema = z.object({
+  id: z.string().regex(/^\d+$/, "Invalid feedback id"),
+}).strict();
+
 export type CreateFeedbackInput = z.infer<typeof createFeedbackSchema>;
 export type FeedbackQueryInput = z.infer<typeof feedbackQuerySchema>;

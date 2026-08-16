@@ -1,5 +1,5 @@
 /** Maximum number of records that can be requested per page. */
-const MAX_LIMIT = 100;
+const MAX_LIMIT = 1000;
 
 /** Maximum page number to prevent deep-offset attacks. */
 const MAX_PAGE = 1000;

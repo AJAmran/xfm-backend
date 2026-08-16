@@ -56,3 +56,13 @@ export function softDeleteUser(id: number) {
 export function updateUserStatus(id: number, isActive: boolean) {
   return prisma.user.update({ where: { id, isDeleted: false }, data: { isActive } });
 }
+
+/**
+ * Revokes every outstanding session for a user (bumps tokenVersion).
+ */
+export function incrementTokenVersion(id: number) {
+  return prisma.user.update({
+    where: { id, isDeleted: false },
+    data: { tokenVersion: { increment: 1 } },
+  });
+}

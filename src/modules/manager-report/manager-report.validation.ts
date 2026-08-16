@@ -17,6 +17,7 @@ const bpCpEntrySchema = z.object({
   entryType: z.enum(["TODAY", "TOMORROW"]),
   guestName: z.string().trim().min(1, "Guest name is required"),
   mobile: z.string().trim().min(1, "Mobile number is required"),
+  totalPax: z.number().int().nonnegative().optional().nullable(),
   comment: z.string().trim().optional().nullable(),
 });
 

@@ -6,7 +6,7 @@ import { UserQueryInput } from "./user.validation";
 import { parsedQuery } from "../../middleware/validation";
 
 export async function create(req: Request, res: Response) {
-  const user = await userService.createUser(req.body);
+  const user = await userService.createUser(req.body, req.user!);
   successResponse(res, "User created successfully", user, httpStatus.CREATED);
 }
 
@@ -22,7 +22,7 @@ export async function list(req: Request, res: Response) {
 }
 
 export async function update(req: Request, res: Response) {
-  const user = await userService.updateUser(Number(req.params.id), req.body);
+  const user = await userService.updateUser(Number(req.params.id), req.body, req.user!);
   successResponse(res, "User updated successfully", user);
 }
 
@@ -32,6 +32,6 @@ export async function remove(req: Request, res: Response) {
 }
 
 export async function updateStatus(req: Request, res: Response) {
-  const user = await userService.setUserStatus(Number(req.params.id), req.body.isActive);
+  const user = await userService.setUserStatus(Number(req.params.id), req.body.isActive, req.user!);
   successResponse(res, "User status updated successfully", user);
 }
