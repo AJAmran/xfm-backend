@@ -6,6 +6,9 @@ import { transformPagination, buildMetadata } from "../../utils/queryBuilder";
 import { toMonthStart, toNextMonthStart, getTodayString } from "../../utils/dateHelpers";
 import { resolveBranchScope } from "../../utils/accessScope";
 import { publishDataChanged } from "../../lib/realtime";
+import { withCache, invalidateByPrefix } from "../../lib/cache";
+import * as notificationService from "../notification/notification.service";
+import { NotificationType } from "../../../generated/prisma/enums";
 import {
   InventoryCategoryCreateInput,
   InventoryCategoryUpdateInput,
@@ -30,6 +33,21 @@ const STATEMENT_INCLUDE = {
   submittedBy: { select: { id: true, name: true } },
   _count: { select: { lines: true } },
 } satisfies Prisma.MonthlyInventoryStatementInclude;
+
+// Statement list reads hit a remote, high-latency DB on every render +
+// realtime refresh. Statements change only when a manager edits/submits, so a
+// short cache avoids re-round-tripping; mutations invalidate the prefix.
+const STATEMENTS_LIST_PREFIX = "inventoryStatements_";
+const STATEMENTS_LIST_TTL = 20;
+
+function statementsListKey(query: InventoryStatementQueryInput, user: AuthUser): string {
+  const scope = isManager(user) ? `bm_${user.branchId ?? "none"}` : "all";
+  return `${STATEMENTS_LIST_PREFIX}${scope}:${JSON.stringify(query)}`;
+}
+
+async function invalidateStatementsListCaches(): Promise<void> {
+  await invalidateByPrefix(STATEMENTS_LIST_PREFIX);
+}
 
 function formatStatement<T extends { statementMonth: Date | string }>(stmt: T): T {
   const statementMonth =
@@ -186,26 +204,32 @@ export async function createStatement(payload: InventoryStatementCreateInput, us
   );
 
   publishDataChanged("inventory.statement-created", { type: "branch", branchId });
+  await invalidateStatementsListCaches();
   return formatStatement(statement);
 }
 
 export async function getPaginatedStatements(query: InventoryStatementQueryInput, user: AuthUser) {
-  const pagination = transformPagination(query);
-  const where: Prisma.MonthlyInventoryStatementWhereInput = { isDeleted: false };
-  if (isManager(user)) where.branchId = user.branchId ?? undefined;
-  else if (query.branchId) where.branchId = Number(query.branchId);
-  if (query.statementMonth) {
-    const monthStart = toMonthStart(query.statementMonth);
-    where.statementMonth = { gte: monthStart, lt: toNextMonthStart(query.statementMonth) };
-  }
-  if (query.status) where.status = query.status;
+  return withCache(statementsListKey(query, user), async () => {
+    const pagination = transformPagination(query);
+    const where: Prisma.MonthlyInventoryStatementWhereInput = { isDeleted: false };
+    if (isManager(user)) where.branchId = user.branchId ?? undefined;
+    else if (query.branchId) where.branchId = Number(query.branchId);
+    if (query.statementMonth) {
+      const monthStart = toMonthStart(query.statementMonth);
+      where.statementMonth = { gte: monthStart, lt: toNextMonthStart(query.statementMonth) };
+    }
+    if (query.status) where.status = query.status;
 
-  const [data, total] = await prisma.$transaction([
-    prisma.monthlyInventoryStatement.findMany({ where, ...pagination, include: STATEMENT_INCLUDE }),
-    prisma.monthlyInventoryStatement.count({ where }),
-  ]);
+    const [data, total] = await prisma.$transaction([
+      prisma.monthlyInventoryStatement.findMany({ where, ...pagination, include: STATEMENT_INCLUDE }),
+      prisma.monthlyInventoryStatement.count({ where }),
+    ]);
 
-  return { data: data.map(formatStatement), meta: buildMetadata(total, pagination) };
+    return {
+      data: data.map(formatStatement),
+      meta: buildMetadata(total, pagination),
+    };
+  }, STATEMENTS_LIST_TTL);
 }
 
 export async function getStatementById(id: number, user: AuthUser) {
@@ -311,6 +335,7 @@ export async function updateStatementLines(id: number, payload: InventoryLineUpd
   );
 
   publishDataChanged("inventory.lines-updated", { type: "branch", branchId: statement.branchId });
+  await invalidateStatementsListCaches();
   return getStatementLines(id, user);
 }
 
@@ -339,6 +364,18 @@ export async function updateStatementStatus(id: number, payload: InventoryStatem
   });
 
   publishDataChanged("inventory.statement-status", { type: "branch", branchId: statement.branchId });
+  await invalidateStatementsListCaches();
+  if (isManager(user) && payload.status === "SUBMITTED") {
+    const month = new Date(updated.statementMonth).toISOString().slice(0, 7);
+    await notificationService.createSubmissionNotification({
+      type: NotificationType.INVENTORY_STATEMENT_SUBMITTED,
+      title: "Inventory statement submitted",
+      message: `${updated.submittedBy?.name ?? "A branch manager"} submitted the ${month} inventory statement for ${updated.branch.name}`,
+      branchId: statement.branchId,
+      entityId: updated.id,
+      actorUserId: user.id,
+    });
+  }
   return formatStatement(updated);
 }
 

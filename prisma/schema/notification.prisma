@@ -1,0 +1,27 @@
+enum NotificationType {
+  MANAGER_REPORT_SUBMITTED
+  INVENTORY_STATEMENT_SUBMITTED
+
+  @@map("notification_type")
+}
+
+model Notification {
+  id          Int              @id @default(autoincrement())
+  type        NotificationType
+  title       String
+  message     String           @db.Text
+  branchId    Int?             @map("branch_id")
+  entityId    Int?             @map("entity_id")
+  actorUserId Int?             @map("actor_user_id")
+  read        Boolean          @default(false)
+  readAt      DateTime?        @map("read_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  actor  User?   @relation("ActorNotifications", fields: [actorUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([read])
+  @@index([branchId, createdAt])
+  @@index([createdAt])
+  @@map("notifications")
+}

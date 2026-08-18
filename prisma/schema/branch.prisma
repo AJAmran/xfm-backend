@@ -17,6 +17,7 @@ model Branch {
   guestDiscountLogs           GuestDiscountLog[]
   guestEntertainmentLogs      GuestEntertainmentLog[]
   monthlyInventoryStatements  MonthlyInventoryStatement[]
+  notifications               Notification[]
 
   @@index([code, isActive])
   @@index([isDeleted])

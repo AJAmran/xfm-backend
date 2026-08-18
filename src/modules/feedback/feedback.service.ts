@@ -5,6 +5,7 @@ import { appError } from "../../utils/appError";
 import { CreateFeedbackInput, FeedbackQueryInput } from "./feedback.validation";
 import { transformPagination, buildMetadata } from "../../utils/queryBuilder";
 import { publishDataChanged } from "../../lib/realtime";
+import { withCache } from "../../lib/cache";
 import { invalidateAnalyticsCaches } from "../analytics/analytics.service";
 
 interface AuthUser {
@@ -66,48 +67,55 @@ export async function getFeedbackById(id: number, user: AuthUser) {
 }
 
 export async function getPaginatedFeedbacks(query: FeedbackQueryInput, branchId?: number) {
-  const pagination = transformPagination(query);
-  const where: Prisma.GuestFeedbackWhereInput = {};
+  // TTL-only cache: feedback arrives constantly, so per-submission invalidation
+  // would defeat the cache. A short TTL absorbs bursts on the remote DB while
+  // keeping list data at most ~12s stale.
+  const cacheKey = `feedbacksList_${branchId || "all"}:${JSON.stringify(query)}`;
 
-  // branchId from auth context (BRANCH_MANAGER) takes precedence over query param.
-  if (branchId) {
-    where.branchId = branchId;
-  } else if (query.branchId) {
-    where.branchId = Number(query.branchId);
-  }
+  return withCache(cacheKey, async () => {
+    const pagination = transformPagination(query);
+    const where: Prisma.GuestFeedbackWhereInput = {};
 
-  if (query.rating) where.overallRating = Number(query.rating);
-
-  if (query.search) {
-    where.OR = [
-      { guestName: { contains: query.search } },
-      { contact: { contains: query.search } },
-    ];
-  }
-
-  if (query.startDate || query.endDate) {
-    const dateFilter: Prisma.DateTimeFilter<"GuestFeedback"> = {};
-    if (query.startDate) dateFilter.gte = new Date(query.startDate);
-    if (query.endDate) {
-      // Inclusive end-of-day so feedback submitted on the end date is included.
-      const end = new Date(query.endDate);
-      end.setHours(23, 59, 59, 999);
-      dateFilter.lte = end;
+    // branchId from auth context (BRANCH_MANAGER) takes precedence over query param.
+    if (branchId) {
+      where.branchId = branchId;
+    } else if (query.branchId) {
+      where.branchId = Number(query.branchId);
     }
-    where.submittedAt = dateFilter;
-  }
 
-  // Run the page rows, total count, and the (tiny) branch lookup in parallel. An
-  // `include` would add a second serialized round-trip per query on high-latency
-  // links, so branch display data is fetched once and mapped in JS.
-  const [rows, total, branches] = await Promise.all([
-    prisma.guestFeedback.findMany({ where, ...pagination }),
-    prisma.guestFeedback.count({ where }),
-    prisma.branch.findMany({ where: { isDeleted: false }, select: { id: true, name: true, code: true } }),
-  ]);
+    if (query.rating) where.overallRating = Number(query.rating);
 
-  const branchMap = new Map(branches.map((b) => [b.id, { name: b.name, code: b.code }]));
-  const data = rows.map((f) => ({ ...f, branch: branchMap.get(f.branchId) ?? null }));
+    if (query.search) {
+      where.OR = [
+        { guestName: { contains: query.search } },
+        { contact: { contains: query.search } },
+      ];
+    }
 
-  return { data, meta: buildMetadata(total, pagination) };
+    if (query.startDate || query.endDate) {
+      const dateFilter: Prisma.DateTimeFilter<"GuestFeedback"> = {};
+      if (query.startDate) dateFilter.gte = new Date(query.startDate);
+      if (query.endDate) {
+        // Inclusive end-of-day so feedback submitted on the end date is included.
+        const end = new Date(query.endDate);
+        end.setHours(23, 59, 59, 999);
+        dateFilter.lte = end;
+      }
+      where.submittedAt = dateFilter;
+    }
+
+    // Run the page rows, total count, and the (tiny) branch lookup in parallel. An
+    // `include` would add a second serialized round-trip per query on high-latency
+    // links, so branch display data is fetched once and mapped in JS.
+    const [rows, total, branches] = await Promise.all([
+      prisma.guestFeedback.findMany({ where, ...pagination }),
+      prisma.guestFeedback.count({ where }),
+      prisma.branch.findMany({ where: { isDeleted: false }, select: { id: true, name: true, code: true } }),
+    ]);
+
+    const branchMap = new Map(branches.map((b) => [b.id, { name: b.name, code: b.code }]));
+    const data = rows.map((f) => ({ ...f, branch: branchMap.get(f.branchId) ?? null }));
+
+    return { data, meta: buildMetadata(total, pagination) };
+  }, 12);
 }

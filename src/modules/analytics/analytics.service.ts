@@ -9,12 +9,27 @@ import { withCache, invalidateByPrefix } from "../../lib/cache";
 // the next dashboard render recomputes fresh numbers.
 const ANALYTICS_PREFIXES = ["ratingStats_", "branchPerf_", "monthlyTrends_", "satisfaction_", "dashboard_summary_"];
 
+// Feedback arrives in bursts (a dinner rush can submit dozens in a minute).
+// Wiping every analytics key on each submission makes the dashboard recompute
+// the full aggregation on every render — which on a remote, high-latency DB
+// is the single biggest source of "dashboard jank". Coalesce invalidation to
+// at most one wipe per window (leading edge): the first feedback of a burst
+// invalidates, the rest ride the freshly computed caches, and data is at most
+// one window stale.
+const INVALIDATION_COALESCE_MS = 20_000;
+let lastInvalidationAt = 0;
+
 export async function invalidateAnalyticsCaches(branchId?: number | null): Promise<void> {
-  await invalidateByPrefix(...ANALYTICS_PREFIXES);
   // Ignore `branchId` here: caches are keyed per (branch × date-range) and a
   // new submission only ever adds rows, so clearing every derived key is the
   // simplest correct invalidation and costs microseconds with NodeCache.
   void branchId;
+
+  const now = Date.now();
+  if (now - lastInvalidationAt < INVALIDATION_COALESCE_MS) return;
+  lastInvalidationAt = now;
+
+  await invalidateByPrefix(...ANALYTICS_PREFIXES);
 }
 
 export async function getRatingAnalytics(branchId?: number, startDate?: string, endDate?: string) {

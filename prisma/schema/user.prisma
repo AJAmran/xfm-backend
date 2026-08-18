@@ -23,6 +23,7 @@ model User {
   verifiedEntertainmentLogs       GuestEntertainmentLog[] @relation("VerifiedEntertainmentLogs")
   approvedEntertainmentLogs       GuestEntertainmentLog[] @relation("ApprovedEntertainmentLogs")
   submittedInventoryStatements    MonthlyInventoryStatement[] @relation("SubmittedInventoryStatements")
+  notifications                   Notification[]             @relation("ActorNotifications")
 
   @@index([email, role])
   @@index([branchId])

@@ -20,6 +20,7 @@ import { ManagerReportRoutes } from "./modules/manager-report/manager-report.rou
 import { GuestOfferRoutes } from "./modules/guest-offer/guest-offer.routes";
 import { InventoryRoutes } from "./modules/inventory/inventory.routes";
 import { RealtimeRoutes } from "./modules/realtime/realtime.routes";
+import { NotificationRoutes } from "./modules/notification/notification.routes";
 
 const app: Application = express();
 
@@ -106,6 +107,7 @@ app.use(`${v1}/settings`, SettingsRoutes);
 app.use(`${v1}/manager-reports`, ManagerReportRoutes);
 app.use(`${v1}/guest-offers`, GuestOfferRoutes);
 app.use(`${v1}/inventory`, InventoryRoutes);
+app.use(`${v1}/notifications`, NotificationRoutes);
 app.use(`${v1}/realtime`, RealtimeRoutes);
 
 app.use(globalErrorHandler);

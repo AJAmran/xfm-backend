@@ -5,6 +5,9 @@ import { appError } from "../../utils/appError";
 import { transformPagination, buildMetadata } from "../../utils/queryBuilder";
 import { formatDateOnly, toDateOnly, toEndOfDay, getTodayString, getYesterdayString } from "../../utils/dateHelpers";
 import { publishDataChanged } from "../../lib/realtime";
+import { withCache, invalidateByPrefix } from "../../lib/cache";
+import * as notificationService from "../notification/notification.service";
+import { NotificationType } from "../../../generated/prisma/enums";
 import {
   CreateManagerReportInput,
   UpdateManagerReportInput,
@@ -29,6 +32,22 @@ const REPORT_INCLUDE = {
     include: { user: { select: { id: true, name: true, role: true } } },
   },
 } satisfies Prisma.ManagerReportInclude;
+
+// List reads hit a remote, high-latency DB on every dashboard render +
+// realtime refresh. Reports change rarely (a handful of mutations per day), so
+// a short cache avoids re-round-tripping the whole table; mutations below
+// invalidate the prefix.
+const REPORTS_LIST_PREFIX = "managerReports_";
+const REPORTS_LIST_TTL = 20;
+
+function reportsListKey(query: ManagerReportQueryInput, user: AuthUser): string {
+  const scope = user.role === "BRANCH_MANAGER" ? `bm_${user.branchId ?? "none"}` : "all";
+  return `${REPORTS_LIST_PREFIX}${scope}:${JSON.stringify(query)}`;
+}
+
+async function invalidateReportsListCaches(): Promise<void> {
+  await invalidateByPrefix(REPORTS_LIST_PREFIX);
+}
 
 function formatReport<T extends { reportDate: Date }>(report: T): T {
   return { ...report, reportDate: formatDateOnly(report.reportDate) } as T;
@@ -115,6 +134,17 @@ export async function createReport(payload: CreateManagerReportInput, user: Auth
       }),
     );
     publishDataChanged("manager-report.created", { type: "branch", branchId });
+    await invalidateReportsListCaches();
+    if (user.role === "BRANCH_MANAGER") {
+      await notificationService.createSubmissionNotification({
+        type: NotificationType.MANAGER_REPORT_SUBMITTED,
+        title: "Daily report submitted",
+        message: `${report.managerName} submitted the daily report for ${report.branch.name} (${formatDateOnly(reportDate)})`,
+        branchId,
+        entityId: report.id,
+        actorUserId: user.id,
+      });
+    }
     return formatReport(report);
   }
 
@@ -126,40 +156,53 @@ export async function createReport(payload: CreateManagerReportInput, user: Auth
   );
 
   publishDataChanged("manager-report.created", { type: "branch", branchId });
+  await invalidateReportsListCaches();
+  if (user.role === "BRANCH_MANAGER") {
+    await notificationService.createSubmissionNotification({
+      type: NotificationType.MANAGER_REPORT_SUBMITTED,
+      title: "Daily report submitted",
+      message: `${report.managerName} submitted the daily report for ${report.branch.name} (${formatDateOnly(reportDate)})`,
+      branchId,
+      entityId: report.id,
+      actorUserId: user.id,
+    });
+  }
   return formatReport(report);
 }
 
 export async function getPaginatedReports(query: ManagerReportQueryInput, user: AuthUser) {
-  const pagination = transformPagination(query);
-  const where: Prisma.ManagerReportWhereInput = { isDeleted: false };
+  return withCache(reportsListKey(query, user), async () => {
+    const pagination = transformPagination(query);
+    const where: Prisma.ManagerReportWhereInput = { isDeleted: false };
 
-  if (user.role === "BRANCH_MANAGER") {
-    where.branchId = user.branchId ?? undefined;
-  } else if (query.branchId) {
-    where.branchId = Number(query.branchId);
-  }
-  if (query.managerName) where.managerName = { contains: query.managerName };
-  if (query.approvalStatus) where.approvalStatus = query.approvalStatus;
-  if (query.startDate || query.endDate) {
-    const dateFilter: Prisma.DateTimeFilter<"ManagerReport"> = {};
-    if (query.startDate) dateFilter.gte = toDateOnly(query.startDate);
-    if (query.endDate) dateFilter.lte = toEndOfDay(query.endDate);
-    where.reportDate = dateFilter;
-  }
+    if (user.role === "BRANCH_MANAGER") {
+      where.branchId = user.branchId ?? undefined;
+    } else if (query.branchId) {
+      where.branchId = Number(query.branchId);
+    }
+    if (query.managerName) where.managerName = { contains: query.managerName };
+    if (query.approvalStatus) where.approvalStatus = query.approvalStatus;
+    if (query.startDate || query.endDate) {
+      const dateFilter: Prisma.DateTimeFilter<"ManagerReport"> = {};
+      if (query.startDate) dateFilter.gte = toDateOnly(query.startDate);
+      if (query.endDate) dateFilter.lte = toEndOfDay(query.endDate);
+      where.reportDate = dateFilter;
+    }
 
-  const [data, total] = await prisma.$transaction([
-    prisma.managerReport.findMany({
-      where,
-      ...pagination,
-      include: {
-        branch: { select: { id: true, name: true, code: true } },
-        _count: { select: { complaints: true, bpCpEntries: true } },
-      },
-    }),
-    prisma.managerReport.count({ where }),
-  ]);
+    const [data, total] = await prisma.$transaction([
+      prisma.managerReport.findMany({
+        where,
+        ...pagination,
+        include: {
+          branch: { select: { id: true, name: true, code: true } },
+          _count: { select: { complaints: true, bpCpEntries: true } },
+        },
+      }),
+      prisma.managerReport.count({ where }),
+    ]);
 
-  return { data: data.map(formatReport), meta: buildMetadata(total, pagination) };
+    return { data: data.map(formatReport), meta: buildMetadata(total, pagination) };
+  }, REPORTS_LIST_TTL);
 }
 
 export async function getReportById(id: number, user: AuthUser) {
@@ -172,19 +215,21 @@ export async function getReportById(id: number, user: AuthUser) {
 }
 
 export async function getReportSummary(user: AuthUser) {
-  const baseWhere: Prisma.ManagerReportWhereInput = { isDeleted: false };
-  if (user.role === "BRANCH_MANAGER") {
-    baseWhere.branchId = user.branchId ?? undefined;
-  }
+  return withCache(`${REPORTS_LIST_PREFIX}summary_${user.role}_${user.branchId ?? "all"}`, async () => {
+    const baseWhere: Prisma.ManagerReportWhereInput = { isDeleted: false };
+    if (user.role === "BRANCH_MANAGER") {
+      baseWhere.branchId = user.branchId ?? undefined;
+    }
 
-  const [total, pending, approved, rejected] = await Promise.all([
-    prisma.managerReport.count({ where: baseWhere }),
-    prisma.managerReport.count({ where: { ...baseWhere, approvalStatus: "PENDING" } }),
-    prisma.managerReport.count({ where: { ...baseWhere, approvalStatus: "APPROVED" } }),
-    prisma.managerReport.count({ where: { ...baseWhere, approvalStatus: "REJECTED" } }),
-  ]);
+    const [total, pending, approved, rejected] = await Promise.all([
+      prisma.managerReport.count({ where: baseWhere }),
+      prisma.managerReport.count({ where: { ...baseWhere, approvalStatus: "PENDING" } }),
+      prisma.managerReport.count({ where: { ...baseWhere, approvalStatus: "APPROVED" } }),
+      prisma.managerReport.count({ where: { ...baseWhere, approvalStatus: "REJECTED" } }),
+    ]);
 
-  return { total, pending, approved, rejected };
+    return { total, pending, approved, rejected };
+  }, REPORTS_LIST_TTL);
 }
 
 export async function updateReport(id: number, payload: UpdateManagerReportInput, user: AuthUser) {
@@ -267,6 +312,17 @@ export async function updateReport(id: number, payload: UpdateManagerReportInput
   );
 
   publishDataChanged("manager-report.updated", { type: "branch", branchId: existing.branchId });
+  await invalidateReportsListCaches();
+  if (user.role === "BRANCH_MANAGER" && existing.approvalStatus === "REJECTED") {
+    await notificationService.createSubmissionNotification({
+      type: NotificationType.MANAGER_REPORT_SUBMITTED,
+      title: "Daily report resubmitted",
+      message: `${report.managerName} resubmitted the daily report for ${report.branch.name} (${formatDateOnly(targetDate)})`,
+      branchId: existing.branchId,
+      entityId: report.id,
+      actorUserId: user.id,
+    });
+  }
   return formatReport(report);
 }
 
@@ -289,6 +345,7 @@ export async function deleteReport(id: number, user: AuthUser) {
     data: { isDeleted: true },
   });
   publishDataChanged("manager-report.deleted", { type: "branch", branchId: existing.branchId });
+  await invalidateReportsListCaches();
   return report;
 }
 
@@ -312,6 +369,7 @@ export async function setReportApproval(id: number, payload: ApprovalStatusInput
   });
 
   publishDataChanged("manager-report.approved", { type: "branch", branchId: existing.branchId });
+  await invalidateReportsListCaches();
   return formatReport(report);
 }
 
@@ -344,5 +402,6 @@ export async function addReportComment(id: number, payload: CreateManagerReportC
     include: { user: { select: { id: true, name: true, role: true } } },
   });
   publishDataChanged("manager-report.commented", { type: "branch", branchId: report.branchId });
+  await invalidateReportsListCaches();
   return comment;
 }

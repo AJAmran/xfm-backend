@@ -6,6 +6,7 @@ import { transformPagination, buildMetadata } from "../../utils/queryBuilder";
 import { formatDateOnly, toDateOnly, toEndOfDay } from "../../utils/dateHelpers";
 import { resolveBranchScope, roundMoney } from "../../utils/accessScope";
 import { publishDataChanged } from "../../lib/realtime";
+import { withCache, invalidateByPrefix } from "../../lib/cache";
 import {
   GuestDiscountCreateInput,
   GuestDiscountUpdateInput,
@@ -34,6 +35,21 @@ function formatLog<T extends { logDate: Date; totalBill?: unknown; discountPerce
     discountAmount: log.discountAmount !== undefined ? Number(log.discountAmount) : undefined,
     foodCost: log.foodCost !== undefined ? Number(log.foodCost) : undefined,
   } as T;
+}
+
+// Guest offer lists + daily sums are read on every dashboard render and realtime
+// refresh; logs change only when a manager adds one or an admin reviews it, so a
+// short cache avoids hitting the remote DB repeatedly. Mutations invalidate.
+const GUEST_OFFERS_PREFIX = "guestOffers_";
+const GUEST_OFFERS_TTL = 15;
+
+function guestOffersKey(kind: string, query: GuestOfferQueryInput, user: AuthUser): string {
+  const scope = isManager(user) ? `bm_${user.branchId ?? "none"}` : "all";
+  return `${GUEST_OFFERS_PREFIX}${kind}_${scope}:${JSON.stringify(query)}`;
+}
+
+async function invalidateGuestOfferCaches(): Promise<void> {
+  await invalidateByPrefix(GUEST_OFFERS_PREFIX);
 }
 
 function buildDateFilter(query: GuestOfferQueryInput): { gte?: Date; lte?: Date } {
@@ -75,28 +91,31 @@ export async function createDiscountLog(payload: GuestDiscountCreateInput, user:
   });
 
   publishDataChanged("guest-offer.discount-created", { type: "branch", branchId });
+  await invalidateGuestOfferCaches();
   return formatLog(log);
 }
 
 export async function getPaginatedDiscountLogs(query: GuestOfferQueryInput, user: AuthUser) {
-  const pagination = transformPagination(query);
-  const where: Prisma.GuestDiscountLogWhereInput = { isDeleted: false };
-  if (isManager(user)) where.branchId = user.branchId ?? undefined;
-  else if (query.branchId) where.branchId = Number(query.branchId);
-  if (query.approvalStatus) where.approvalStatus = query.approvalStatus;
-  if (query.search) where.guestName = { contains: query.search };
-  if (query.logDate || query.startDate || query.endDate) where.logDate = buildDateFilter(query);
+  return withCache(guestOffersKey("discountList", query, user), async () => {
+    const pagination = transformPagination(query);
+    const where: Prisma.GuestDiscountLogWhereInput = { isDeleted: false };
+    if (isManager(user)) where.branchId = user.branchId ?? undefined;
+    else if (query.branchId) where.branchId = Number(query.branchId);
+    if (query.approvalStatus) where.approvalStatus = query.approvalStatus;
+    if (query.search) where.guestName = { contains: query.search };
+    if (query.logDate || query.startDate || query.endDate) where.logDate = buildDateFilter(query);
 
-  const [data, total] = await prisma.$transaction([
-    prisma.guestDiscountLog.findMany({
-      where,
-      ...pagination,
-      include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } } },
-    }),
-    prisma.guestDiscountLog.count({ where }),
-  ]);
+    const [data, total] = await prisma.$transaction([
+      prisma.guestDiscountLog.findMany({
+        where,
+        ...pagination,
+        include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } } },
+      }),
+      prisma.guestDiscountLog.count({ where }),
+    ]);
 
-  return { data: data.map(formatLog), meta: buildMetadata(total, pagination) };
+    return { data: data.map(formatLog), meta: buildMetadata(total, pagination) };
+  }, GUEST_OFFERS_TTL);
 }
 
 export async function getDiscountLogById(id: number, user: AuthUser) {
@@ -140,6 +159,7 @@ export async function updateDiscountLog(id: number, payload: GuestDiscountUpdate
     include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } } },
   });
   publishDataChanged("guest-offer.discount-updated", { type: "branch", branchId: existing.branchId });
+  await invalidateGuestOfferCaches();
   return formatLog(log);
 }
 
@@ -159,15 +179,20 @@ export async function setDiscountLogApproval(id: number, payload: ApprovalStatus
     include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } } },
   });
   publishDataChanged("guest-offer.discount-approved", { type: "branch", branchId: existing.branchId });
+  await invalidateGuestOfferCaches();
   return formatLog(log);
 }
 
 export async function deleteDiscountLog(id: number, user: AuthUser) {
-  const existing = await prisma.guestDiscountLog.findUnique({ where: { id }, select: { branchId: true, isDeleted: true } });
+  const existing = await prisma.guestDiscountLog.findUnique({ where: { id }, select: { branchId: true, isDeleted: true, approvalStatus: true } });
   if (!existing || existing.isDeleted) throw appError("Discount log not found", httpStatus.NOT_FOUND);
   if (isManager(user) && existing.branchId !== user.branchId) throw appError("Forbidden: own branch only", httpStatus.FORBIDDEN);
+  if (existing.approvalStatus === "APPROVED" && user.role !== "SUPER_ADMIN") {
+    throw appError("Approved discount logs can only be deleted by a Super Admin", httpStatus.FORBIDDEN);
+  }
   const log = await prisma.guestDiscountLog.update({ where: { id }, data: { isDeleted: true } });
   publishDataChanged("guest-offer.discount-deleted", { type: "branch", branchId: existing.branchId });
+  await invalidateGuestOfferCaches();
   return log;
 }
 
@@ -196,28 +221,31 @@ export async function createEntertainmentLog(payload: GuestEntertainmentCreateIn
   });
 
   publishDataChanged("guest-offer.entertainment-created", { type: "branch", branchId });
+  await invalidateGuestOfferCaches();
   return formatLog(log);
 }
 
 export async function getPaginatedEntertainmentLogs(query: GuestOfferQueryInput, user: AuthUser) {
-  const pagination = transformPagination(query);
-  const where: Prisma.GuestEntertainmentLogWhereInput = { isDeleted: false };
-  if (isManager(user)) where.branchId = user.branchId ?? undefined;
-  else if (query.branchId) where.branchId = Number(query.branchId);
-  if (query.approvalStatus) where.approvalStatus = query.approvalStatus;
-  if (query.search) where.guestName = { contains: query.search };
-  if (query.logDate || query.startDate || query.endDate) where.logDate = buildDateFilter(query);
+  return withCache(guestOffersKey("entertainmentList", query, user), async () => {
+    const pagination = transformPagination(query);
+    const where: Prisma.GuestEntertainmentLogWhereInput = { isDeleted: false };
+    if (isManager(user)) where.branchId = user.branchId ?? undefined;
+    else if (query.branchId) where.branchId = Number(query.branchId);
+    if (query.approvalStatus) where.approvalStatus = query.approvalStatus;
+    if (query.search) where.guestName = { contains: query.search };
+    if (query.logDate || query.startDate || query.endDate) where.logDate = buildDateFilter(query);
 
-  const [data, total] = await prisma.$transaction([
-    prisma.guestEntertainmentLog.findMany({
-      where,
-      ...pagination,
-      include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } } },
-    }),
-    prisma.guestEntertainmentLog.count({ where }),
-  ]);
+    const [data, total] = await prisma.$transaction([
+      prisma.guestEntertainmentLog.findMany({
+        where,
+        ...pagination,
+        include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } } },
+      }),
+      prisma.guestEntertainmentLog.count({ where }),
+    ]);
 
-  return { data: data.map(formatLog), meta: buildMetadata(total, pagination) };
+    return { data: data.map(formatLog), meta: buildMetadata(total, pagination) };
+  }, GUEST_OFFERS_TTL);
 }
 
 export async function getEntertainmentLogById(id: number, user: AuthUser) {
@@ -256,6 +284,7 @@ export async function updateEntertainmentLog(id: number, payload: GuestEntertain
     include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } } },
   });
   publishDataChanged("guest-offer.entertainment-updated", { type: "branch", branchId: existing.branchId });
+  await invalidateGuestOfferCaches();
   return formatLog(log);
 }
 
@@ -275,60 +304,67 @@ export async function setEntertainmentLogApproval(id: number, payload: ApprovalS
     include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } } },
   });
   publishDataChanged("guest-offer.entertainment-approved", { type: "branch", branchId: existing.branchId });
+  await invalidateGuestOfferCaches();
   return formatLog(log);
 }
 
 export async function deleteEntertainmentLog(id: number, user: AuthUser) {
-  const existing = await prisma.guestEntertainmentLog.findUnique({ where: { id }, select: { branchId: true, isDeleted: true } });
+  const existing = await prisma.guestEntertainmentLog.findUnique({ where: { id }, select: { branchId: true, isDeleted: true, approvalStatus: true } });
   if (!existing || existing.isDeleted) throw appError("Entertainment log not found", httpStatus.NOT_FOUND);
   if (isManager(user) && existing.branchId !== user.branchId) throw appError("Forbidden: own branch only", httpStatus.FORBIDDEN);
+  if (existing.approvalStatus === "APPROVED" && user.role !== "SUPER_ADMIN") {
+    throw appError("Approved entertainment logs can only be deleted by a Super Admin", httpStatus.FORBIDDEN);
+  }
   const log = await prisma.guestEntertainmentLog.update({ where: { id }, data: { isDeleted: true } });
   publishDataChanged("guest-offer.entertainment-deleted", { type: "branch", branchId: existing.branchId });
+  await invalidateGuestOfferCaches();
   return log;
 }
 
 // ─── Daily summary ────────────────────────────────────────────────────────────
 
 export async function getDailySummary(query: GuestOfferQueryInput, user: AuthUser) {
-  const discountWhere: Prisma.GuestDiscountLogWhereInput = { isDeleted: false };
-  const entertainmentWhere: Prisma.GuestEntertainmentLogWhereInput = { isDeleted: false };
+  return withCache(guestOffersKey("dailySummary", query, user), async () => {
+    const discountWhere: Prisma.GuestDiscountLogWhereInput = { isDeleted: false };
+    const entertainmentWhere: Prisma.GuestEntertainmentLogWhereInput = { isDeleted: false };
 
-  if (isManager(user)) {
-    discountWhere.branchId = user.branchId ?? undefined;
-    entertainmentWhere.branchId = user.branchId ?? undefined;
-  } else if (query.branchId) {
-    discountWhere.branchId = Number(query.branchId);
-    entertainmentWhere.branchId = Number(query.branchId);
-  }
-  if (query.logDate || query.startDate || query.endDate) {
-    const start = query.logDate ? toDateOnly(query.logDate) : query.startDate ? toDateOnly(query.startDate) : undefined;
-    const end = query.logDate ? toEndOfDay(query.logDate) : query.endDate ? toEndOfDay(query.endDate) : undefined;
-    discountWhere.logDate = { ...(start ? { gte: start } : {}), ...(end ? { lte: end } : {}) };
-    entertainmentWhere.logDate = { ...(start ? { gte: start } : {}), ...(end ? { lte: end } : {}) };
-  }
+    if (isManager(user)) {
+      discountWhere.branchId = user.branchId ?? undefined;
+      entertainmentWhere.branchId = user.branchId ?? undefined;
+    } else if (query.branchId) {
+      discountWhere.branchId = Number(query.branchId);
+      entertainmentWhere.branchId = Number(query.branchId);
+    }
+    if (query.logDate || query.startDate || query.endDate) {
+      const start = query.logDate ? toDateOnly(query.logDate) : query.startDate ? toDateOnly(query.startDate) : undefined;
+      const end = query.logDate ? toEndOfDay(query.logDate) : query.endDate ? toEndOfDay(query.endDate) : undefined;
+      discountWhere.logDate = { ...(start ? { gte: start } : {}), ...(end ? { lte: end } : {}) };
+      entertainmentWhere.logDate = { ...(start ? { gte: start } : {}), ...(end ? { lte: end } : {}) };
+    }
 
-  const [discountAgg, entertainmentAgg] = await Promise.all([
-    prisma.guestDiscountLog.aggregate({
-      where: discountWhere,
-      _sum: { discountAmount: true, totalBill: true },
-      _count: true,
-    }),
-    prisma.guestEntertainmentLog.aggregate({
-      where: entertainmentWhere,
-      _sum: { foodCost: true },
-      _count: true,
-    }),
-  ]);
+    const [discountAgg, entertainmentAgg] = await Promise.all([
+      prisma.guestDiscountLog.aggregate({
+        where: discountWhere,
+        _sum: { discountAmount: true, totalBill: true },
+        _count: true,
+      }),
+      prisma.guestEntertainmentLog.aggregate({
+        where: entertainmentWhere,
+        _sum: { foodCost: true },
+        _count: true,
+      }),
+    ]);
 
-  return {
-    discount: {
-      totalBill: Number(discountAgg._sum.totalBill) || 0,
-      totalDiscountAmount: Number(discountAgg._sum.discountAmount) || 0,
-      logs: discountAgg._count,
-    },
-    entertainment: {
-      totalCost: Number(entertainmentAgg._sum.foodCost) || 0,
-      logs: entertainmentAgg._count,
-    },
-  };
+    return {
+      discount: {
+        totalBill: Number(discountAgg._sum.totalBill) || 0,
+        totalDiscountAmount: Number(discountAgg._sum.discountAmount) || 0,
+        logs: discountAgg._count,
+      },
+      entertainment: {
+        totalCost: Number(entertainmentAgg._sum.foodCost) || 0,
+        logs: entertainmentAgg._count,
+      },
+    };
+  }, GUEST_OFFERS_TTL);
 }
