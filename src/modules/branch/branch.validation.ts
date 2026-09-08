@@ -7,6 +7,7 @@ export const createBranchSchema = z.object({
   phone: z.string().trim().optional(),
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
+  capacity: z.number().int().positive().optional().nullable(),
 });
 
 export const updateBranchSchema = z.object({
@@ -16,6 +17,7 @@ export const updateBranchSchema = z.object({
   phone: z.string().trim().nullable().optional(),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
+  capacity: z.number().int().positive().nullable().optional(),
   isActive: z.boolean().optional(),
 });
 

@@ -2,6 +2,8 @@ enum Role {
   SUPER_ADMIN
   ADMIN
   BRANCH_MANAGER
+  COO
+  MD
 
   @@map("role")
 }
@@ -44,4 +46,27 @@ enum InventoryStatementStatus {
   LOCKED
 
   @@map("inventory_statement_status")
+}
+
+enum BookingPartyType {
+  LUNCH
+  DINNER
+
+  @@map("booking_party_type")
+}
+
+enum BookingStatus {
+  TENTATIVE
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+
+  @@map("booking_status")
+}
+
+enum PaxAdjustmentType {
+  INCREASE
+  DECREASE
+
+  @@map("pax_adjustment_type")
 }

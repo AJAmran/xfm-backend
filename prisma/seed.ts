@@ -2,58 +2,22 @@ import {
   Role,
   HeardAbout,
   AgeGroup,
-  BpCpEntryType,
   ApprovalStatus,
   InventoryStatementStatus,
 } from "../generated/prisma/enums";
-import "dotenv/config";
-import bcrypt from "bcryptjs";
-import { randomBytes } from "node:crypto";
-import { PrismaMariaDb } from "@prisma/adapter-mariadb";
-import { PrismaClient } from "../generated/prisma/client";
 import { INVENTORY_CATALOG } from "./inventory-catalog";
+import {
+  createSeedClient,
+  SALT_ROUNDS,
+  resolveSeedPassword,
+  KNOWN_ACCOUNTS,
+  hashPassword,
+} from "./seed-utils";
+import bcrypt from "bcryptjs";
 
 // Seed creates its own Prisma instance (separate from the app) so it can be run
 // independently without importing the full app's module graph.
-const dbUrl = new URL(process.env.DATABASE_URL!);
-const useSsl =
-  process.env.DATABASE_SSL !== undefined
-    ? process.env.DATABASE_SSL === "true"
-    : dbUrl.searchParams.get("ssl-mode") === "REQUIRED";
-
-const adapter = new PrismaMariaDb({
-  host: dbUrl.hostname,
-  port: dbUrl.port ? Number(dbUrl.port) : 3306,
-  user: decodeURIComponent(dbUrl.username),
-  password: decodeURIComponent(dbUrl.password),
-  database: dbUrl.pathname.slice(1),
-  connectTimeout: 10_000,
-  acquireTimeout: 15_000,
-  minimumIdle: 1,
-  ...(useSsl
-    ? {
-        ssl: {
-          rejectUnauthorized: false,
-        },
-      }
-    : {}),
-});
-const prisma = new PrismaClient({ adapter });
-
-const SALT_ROUNDS = Number(process.env.SALT_ROUNDS) || 12;
-
-function generateStrongPassword(length = 24): string {
-  return randomBytes(length).toString("base64url");
-}
-
-function resolveSeedPassword(envKey: string, label: string): string {
-  const fromEnv = process.env[envKey];
-  if (fromEnv) return fromEnv;
-  const generated = generateStrongPassword();
-  console.warn(`  ⚠ ${envKey} not set — using a generated password for ${label}. Set ${envKey} to pin it.`);
-  console.log(`    ${label} login → password: ${generated}`);
-  return generated;
-}
+const prisma = createSeedClient();
 
 // ─── Static data ──────────────────────────────────────────────────────────────
 const BRANCHES = [
@@ -464,7 +428,6 @@ async function main() {
   await prisma.$transaction([
     prisma.guestFeedback.deleteMany(),
     prisma.guestComplaint.deleteMany(),
-    prisma.bpCpEntry.deleteMany(),
     prisma.managerReport.deleteMany(),
     prisma.guestDiscountLog.deleteMany(),
     prisma.guestEntertainmentLog.deleteMany(),
@@ -502,14 +465,18 @@ async function main() {
     console.log(`      ${b.code} — ${b.name}`),
   );
 
-  const superAdminPw = await bcrypt.hash(
-    resolveSeedPassword("SEED_SUPER_ADMIN_PASSWORD", "Super Admin"),
-    SALT_ROUNDS,
+  // Well-known accounts come from the shared registry (single source of
+  // truth with rotate-seed-passwords.ts and ensure-executive-accounts.ts).
+  const knownUsers = await Promise.all(
+    KNOWN_ACCOUNTS.map(async (a) => ({
+      name: a.name,
+      email: a.email,
+      password: await hashPassword(resolveSeedPassword(a.envKey, a.label, a.fallbackPassword)),
+      role: a.role,
+      signatureUrl: a.signatureUrl ?? null,
+    })),
   );
-  const adminPw = await bcrypt.hash(
-    resolveSeedPassword("SEED_ADMIN_PASSWORD", "Admin"),
-    SALT_ROUNDS,
-  );
+
   const managerPassword = resolveSeedPassword("SEED_MANAGER_PASSWORD", "Branch Managers");
 
   const managerHashPromises = BRANCH_MANAGERS.map(async (m) => ({
@@ -520,18 +487,7 @@ async function main() {
 
   await prisma.user.createMany({
     data: [
-      {
-        name: "Super Administrator",
-        email: "superadmin@x-grouprestaurant.com",
-        password: superAdminPw,
-        role: Role.SUPER_ADMIN,
-      },
-      {
-        name: "System Administrator",
-        email: "admin@x-grouprestaurant.com",
-        password: adminPw,
-        role: Role.ADMIN,
-      },
+      ...knownUsers,
       ...managersWithHashes
         .filter((m) => {
           if (!branchMap.has(m.code)) {
@@ -552,7 +508,7 @@ async function main() {
     ],
   });
   console.log(
-    `  ✓ Users: 1 super admin, 1 admin, ${managersWithHashes.length} branch managers`,
+    `  ✓ Users: ${knownUsers.map((u) => `${u.role} (${u.email})`).join(", ")}, ${managersWithHashes.length} branch managers`,
   );
 
   const FEEDBACK_COUNT = 120;
@@ -674,22 +630,6 @@ async function main() {
               responsiblePerson: "চেফ ইন চার্জ",
               actionTaken: "ডিশ রি-মেক করে পরিবেশন করা হয়েছে।",
               solution: "কুয়ালিটি চেক প্রসেস শক্তিশালী করা হয়েছে।",
-            },
-          ],
-        },
-        bpCpEntries: {
-          create: [
-            {
-              entryType: BpCpEntryType.TODAY,
-              guestName: "মেহেদী",
-              mobile: "01733330000",
-              comment: "আজকের ভিজিট, পরিচিত কাস্টমার।",
-            },
-            {
-              entryType: BpCpEntryType.TOMORROW,
-              guestName: "নাফিসা",
-              mobile: "01744440000",
-              comment: "আগামীকাল ফ্যামিলি ডিনার রিজার্ভেশন।",
             },
           ],
         },

@@ -11,6 +11,6 @@ const route = Router();
 route.post("/login", authLimiter, validateSchema({ body: loginValidationSchema }), authController.login);
 route.post("/refresh-token", authController.refreshToken);
 route.post("/logout", authController.logout);
-route.get("/me", authGuard(Role.SUPER_ADMIN, Role.ADMIN, Role.BRANCH_MANAGER), authController.me);
+route.get("/me", authGuard(Role.SUPER_ADMIN, Role.ADMIN, Role.BRANCH_MANAGER, Role.COO, Role.MD), authController.me);
 
 export const AuthRoutes = route;

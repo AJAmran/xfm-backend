@@ -26,6 +26,9 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   REPORT_EXPORT_LIMIT: z.coerce.number().positive().default(5000),
   REPORT_FETCH_LIMIT: z.coerce.number().positive().default(1000),
+  RATE_LIMIT_MAX: z.coerce.number().positive().default(2000),
+  RATE_LIMIT_WINDOW_MS: z.coerce.number().positive().default(15 * 60 * 1000),
+  AUTH_RATE_LIMIT_MAX: z.coerce.number().positive().default(50),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -51,5 +54,8 @@ export default {
   node_env: env.NODE_ENV,
   report_export_limit: env.REPORT_EXPORT_LIMIT,
   report_fetch_limit: env.REPORT_FETCH_LIMIT,
+  rate_limit_max: env.RATE_LIMIT_MAX,
+  rate_limit_window_ms: env.RATE_LIMIT_WINDOW_MS,
+  auth_rate_limit_max: env.AUTH_RATE_LIMIT_MAX,
   redis_url: env.REDIS_URL,
 };

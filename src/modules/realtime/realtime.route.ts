@@ -5,6 +5,6 @@ import { Role } from "../../../generated/prisma/enums";
 
 const router = Router();
 
-router.get("/events", authGuard(Role.SUPER_ADMIN, Role.ADMIN, Role.BRANCH_MANAGER), realtimeController.streamEvents);
+router.get("/events", authGuard(Role.SUPER_ADMIN, Role.ADMIN, Role.BRANCH_MANAGER, Role.COO, Role.MD), realtimeController.streamEvents);
 
 export { router as RealtimeRoutes };

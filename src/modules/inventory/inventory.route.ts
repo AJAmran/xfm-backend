@@ -19,7 +19,10 @@ import {
 
 const router = Router();
 
-router.use(authGuard(Role.SUPER_ADMIN, Role.ADMIN, Role.BRANCH_MANAGER));
+router.use(authGuard(Role.SUPER_ADMIN, Role.ADMIN, Role.BRANCH_MANAGER, Role.COO, Role.MD));
+
+/** MD (Managing Director) is read-only: statement writes re-guard without MD. */
+const writeGuard = authGuard(Role.SUPER_ADMIN, Role.ADMIN, Role.BRANCH_MANAGER, Role.COO);
 
 // Categories & items — admin only for writes, all roles can read
 router.get("/categories", inventoryController.listCategories);
@@ -33,12 +36,12 @@ router.patch("/items/:id", authGuard(Role.SUPER_ADMIN, Role.ADMIN), validateSche
 router.delete("/items/:id", authGuard(Role.SUPER_ADMIN, Role.ADMIN), validateSchema({ params: inventoryIdSchema }), inventoryController.removeItem);
 
 // Statements
-router.post("/statements", validateSchema({ body: inventoryStatementCreateSchema }), inventoryController.createStatement);
+router.post("/statements", writeGuard, validateSchema({ body: inventoryStatementCreateSchema }), inventoryController.createStatement);
 router.get("/statements", validateSchema({ query: inventoryStatementQuerySchema }), inventoryController.listStatements);
 router.get("/statements/:id", validateSchema({ params: inventoryIdSchema }), inventoryController.getStatement);
 router.get("/statements/:id/lines", validateSchema({ params: inventoryIdSchema }), inventoryController.getStatementLines);
-router.patch("/statements/:id/lines", validateSchema({ params: inventoryIdSchema, body: inventoryLineUpdateSchema }), inventoryController.updateStatementLines);
-router.patch("/statements/:id/status", validateSchema({ params: inventoryIdSchema, body: inventoryStatementStatusSchema }), inventoryController.updateStatementStatus);
+router.patch("/statements/:id/lines", writeGuard, validateSchema({ params: inventoryIdSchema, body: inventoryLineUpdateSchema }), inventoryController.updateStatementLines);
+router.patch("/statements/:id/status", writeGuard, validateSchema({ params: inventoryIdSchema, body: inventoryStatementStatusSchema }), inventoryController.updateStatementStatus);
 
 // Report
 router.get("/report", validateSchema({ query: inventoryReportQuerySchema }), inventoryController.getInventoryReport);

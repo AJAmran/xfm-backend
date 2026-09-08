@@ -114,7 +114,7 @@ export async function getAllActiveBranches() {
   return withCache(`${BRANCH_LIST_PREFIX}active`, async () => {
     const branches = await prisma.branch.findMany({
       where: { isActive: true, isDeleted: false },
-      select: { id: true, name: true, code: true, address: true, phone: true, latitude: true, longitude: true },
+      select: { id: true, name: true, code: true, address: true, phone: true, latitude: true, longitude: true, capacity: true },
     });
     return branches.map(formatBranch);
   }, BRANCH_LIST_TTL);

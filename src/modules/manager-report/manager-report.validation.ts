@@ -3,22 +3,14 @@ import { z } from "zod";
 const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a date in YYYY-MM-DD format");
 
 const guestComplaintSchema = z.object({
-  guestName: z.string().trim().min(1, "Guest name is required"),
-  mobile: z.string().trim().min(1, "Mobile number is required"),
-  email: z.string().email().trim().optional().nullable(),
-  complaintDetails: z.string().trim().min(1, "Complaint details are required"),
+  guestName: z.string().trim().optional().default(""),
+  mobile: z.string().trim().optional().default(""),
+  email: z.string().trim().optional().nullable().default(null),
+  complaintDetails: z.string().trim().optional().default(""),
   serviceProviderName: z.string().trim().optional().default(""),
   responsiblePerson: z.string().trim().optional().default(""),
-  actionTaken: z.string().trim().min(1, "Action taken is required"),
-  solution: z.string().trim().min(1, "Solution is required"),
-});
-
-const bpCpEntrySchema = z.object({
-  entryType: z.enum(["TODAY", "TOMORROW"]),
-  guestName: z.string().trim().min(1, "Guest name is required"),
-  mobile: z.string().trim().min(1, "Mobile number is required"),
-  totalPax: z.number().int().nonnegative().optional().nullable(),
-  comment: z.string().trim().optional().nullable(),
+  actionTaken: z.string().trim().optional().default(""),
+  solution: z.string().trim().optional().default(""),
 });
 
 export const createManagerReportSchema = z.object({
@@ -30,18 +22,16 @@ export const createManagerReportSchema = z.object({
   briefingPoints: z.string().trim().default(""),
   dailyLearnings: z.string().trim().default(""),
   complaints: z.array(guestComplaintSchema).max(50).optional().default([]),
-  bpCpEntries: z.array(bpCpEntrySchema).max(50).optional().default([]),
 }).strict();
 
 export const updateManagerReportSchema = z.object({
-  managerName: z.string().trim().min(1).optional(),
+  managerName: z.string().trim().optional(),
   reportDate: dateOnly.optional(),
   managerComments: z.string().trim().optional(),
   supplyPurchaseIssues: z.string().trim().optional(),
   briefingPoints: z.string().trim().optional(),
   dailyLearnings: z.string().trim().optional(),
   complaints: z.array(guestComplaintSchema).max(50).optional(),
-  bpCpEntries: z.array(bpCpEntrySchema).max(50).optional(),
 }).strict();
 
 export const managerReportQuerySchema = z.object({

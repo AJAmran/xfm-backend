@@ -8,7 +8,7 @@ import { Role } from "../../../generated/prisma/enums";
 const router = Router();
 
 router.post("/", validateSchema({ body: createFeedbackSchema }), feedbackController.submit);
-router.get("/", authGuard(Role.SUPER_ADMIN, Role.ADMIN, Role.BRANCH_MANAGER), validateSchema({ query: feedbackQuerySchema }), feedbackController.list);
-router.get("/:id", authGuard(Role.SUPER_ADMIN, Role.ADMIN, Role.BRANCH_MANAGER), validateSchema({ params: feedbackIdParamSchema }), feedbackController.getById);
+router.get("/", authGuard(Role.SUPER_ADMIN, Role.ADMIN, Role.BRANCH_MANAGER, Role.COO, Role.MD), validateSchema({ query: feedbackQuerySchema }), feedbackController.list);
+router.get("/:id", authGuard(Role.SUPER_ADMIN, Role.ADMIN, Role.BRANCH_MANAGER, Role.COO, Role.MD), validateSchema({ params: feedbackIdParamSchema }), feedbackController.getById);
 
 export { router as FeedbackRoutes };

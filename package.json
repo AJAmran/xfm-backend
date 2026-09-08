@@ -11,9 +11,14 @@
     "start": "node dist/server.js",
     "build": "tsup src/server.ts --format cjs --clean",
     "seed": "npx tsx prisma/seed.ts",
+    "ensure:executives": "npx tsx prisma/ensure-executive-accounts.ts",
     "seed:inventory": "npx tsx prisma/seed-inventory-catalog.ts",
+    "passwords:rotate": "npx tsx prisma/rotate-seed-passwords.ts",
+    "db:status": "prisma migrate status",
+    "db:deploy": "prisma migrate deploy",
     "postinstall": "prisma generate",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "tsx --test src/modules/booking/booking.logic.test.ts",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [],
   "author": "",

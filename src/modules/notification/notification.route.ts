@@ -7,7 +7,7 @@ import { notificationQuerySchema, notificationIdSchema } from "./notification.va
 
 const router = Router();
 
-router.use(authGuard(Role.SUPER_ADMIN, Role.ADMIN, Role.BRANCH_MANAGER));
+router.use(authGuard(Role.SUPER_ADMIN, Role.ADMIN, Role.BRANCH_MANAGER, Role.COO, Role.MD));
 
 router.get("/", validateSchema({ query: notificationQuerySchema }), notificationController.list);
 router.get("/unread-count", notificationController.unreadCount);

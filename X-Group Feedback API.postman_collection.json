@@ -1957,7 +1957,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"branchId\": 1,\n  \"managerName\": \"Rahim Uddin\",\n  \"reportDate\": \"2026-08-03\",\n  \"managerComments\": \"Good evening service flow.\",\n  \"supplyPurchaseIssues\": \"Rice stock running low.\",\n  \"briefingPoints\": \"Reinforce table-clearing speed.\",\n  \"dailyLearnings\": \"Large group handled well.\",\n  \"complaints\": [\n    {\n      \"guestName\": \"Tanvir Ahmed\",\n      \"mobile\": \"01711111111\",\n      \"complaintDetails\": \"Serving delay at table 5.\",\n      \"serviceProviderName\": \"Waiter\",\n      \"responsiblePerson\": \"Karim\",\n      \"actionTaken\": \"Apologized and expedited order.\",\n      \"solution\": \"Complimentary dessert provided.\"\n    }\n  ],\n  \"bpCpEntries\": [\n    {\n      \"entryType\": \"TOMORROW\",\n      \"guestName\": \"Nusrat Jahan\",\n      \"mobile\": \"01822222222\",\n      \"comment\": \"VIP booking for tomorrow.\"\n    }\n  ]\n}"
+							"raw": "{\n  \"branchId\": 1,\n  \"managerName\": \"Rahim Uddin\",\n  \"reportDate\": \"2026-08-03\",\n  \"managerComments\": \"Good evening service flow.\",\n  \"supplyPurchaseIssues\": \"Rice stock running low.\",\n  \"briefingPoints\": \"Reinforce table-clearing speed.\",\n  \"dailyLearnings\": \"Large group handled well.\",\n  \"complaints\": [\n    {\n      \"guestName\": \"Tanvir Ahmed\",\n      \"mobile\": \"01711111111\",\n      \"complaintDetails\": \"Serving delay at table 5.\",\n      \"serviceProviderName\": \"Waiter\",\n      \"responsiblePerson\": \"Karim\",\n      \"actionTaken\": \"Apologized and expedited order.\",\n      \"solution\": \"Complimentary dessert provided.\"\n    }\n  ]\n}"
 						},
 						"url": {
 							"raw": "{{BASE_URL}}/manager-reports",

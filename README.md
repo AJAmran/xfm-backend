@@ -227,11 +227,11 @@ Setting (standalone key-value table)
 
 ### Enums
 
-| Enum         | Values                                                 |
-| ------------ | ------------------------------------------------------ |
-| `Role`       | `SUPER_ADMIN`, `ADMIN`, `BRANCH_MANAGER`               |
-| `HeardAbout` | `SOCIAL_MEDIA`, `FRIENDS_AND_FAMILY`, `VISITED_BEFORE` |
-| `AgeGroup`   | `BELOW_18`, `AGE_18_30`, `AGE_31_50`, `AGE_51_PLUS`    |
+| Enum         | Values                                                          |
+| ------------ | --------------------------------------------------------------- |
+| `Role`       | `SUPER_ADMIN`, `ADMIN`, `BRANCH_MANAGER`, `COO`, `MD`            |
+| `HeardAbout` | `SOCIAL_MEDIA`, `FRIENDS_AND_FAMILY`, `VISITED_BEFORE`          |
+| `AgeGroup`   | `BELOW_18`, `AGE_18_30`, `AGE_31_50`, `AGE_51_PLUS`              |
 
 ### Indexes
 
@@ -246,23 +246,38 @@ The `guest_feedbacks` table has the following indexes:
 
 After `npm run seed`:
 
-| Type      | Count                                           |
-| --------- | ----------------------------------------------- |
-| Branches  | 15 (all X-Group Dhaka locations)                |
-| Users     | 17 (1 super admin, 1 admin, 15 branch managers) |
-| Feedbacks | 120 (spread across last 6 months)               |
-| Settings  | 5 default key-value entries                     |
+| Type      | Count                                                        |
+| --------- | ------------------------------------------------------------ |
+| Branches  | 15 (all X-Group Dhaka locations)                             |
+| Users     | 19 (1 super admin, 1 admin, 1 COO, 1 MD, 15 branch managers)  |
+| Feedbacks | 120 (spread across last 6 months)                            |
+| Settings  | 5 default key-value entries                                  |
 
 **Seeded credentials:**
 
-| Role                  | Email                              | Password         |
-| --------------------- | ---------------------------------- | ---------------- |
-| Super Admin           | `superadmin@x-grouprestaurant.com` | `SuperAdmin@123` |
-| Admin                 | `admin@x-grouprestaurant.com`      | `Admin@123`      |
-| Branch Manager (X-01) | `xian@x-grouprestaurant.com`       | `Xian@123`       |
-| Branch Manager (X-02) | `xenial@x-grouprestaurant.com`     | `Xenial@123`     |
+| Role                  | Email                              | Password               |
+| --------------------- | ---------------------------------- | ---------------------- |
+| Super Admin           | `superadmin@x-grouprestaurant.com` | `SuperAdmin@123`       |
+| Admin                 | `admin@x-grouprestaurant.com`      | `Admin@123`            |
+| COO                   | `coo@x-grouprestaurant.com`    | `Coo@2026`             |
+| MD                    | `md@x-grouprestaurant.com`         | `Managingderector@2026`|
+| Branch Manager (X-01) | `xian@x-grouprestaurant.com`       | `Xian@123`             |
+| Branch Manager (X-02) | `xenial@x-grouprestaurant.com`     | `Xenial@123`           |
 
-_(Full list in `prisma/seed.ts`)_
+_(Full list in `prisma/seed.ts`. Passwords can be pinned via `SEED_*_PASSWORD` env vars.)_
+
+### Database Scripts
+
+| Script                    | Safe on prod? | Purpose                                              |
+| ------------------------- | ------------- | ---------------------------------------------------- |
+| `npm run seed`            | ❌ Dev only   | **Wipes all data**, then seeds everything (refuses production without `ALLOW_PRODUCTION_SEED=true`) |
+| `npm run ensure:executives` | ✅ Yes      | Upserts COO/MD accounts by email, touches nothing else |
+| `npm run seed:inventory`  | ✅ Yes        | Idempotent inventory catalog sync (creates missing, re-syncs order) |
+| `npm run passwords:rotate`| ✅ Yes        | Re-hashes known seed accounts, revokes their sessions |
+| `npm run db:status`       | ✅ Yes        | Shows applied vs pending migrations (read-only)      |
+| `npm run db:deploy`       | ✅ Yes        | Applies pending migrations (always run after pull)   |
+
+All scripts share `prisma/seed-utils.ts` (client setup, password resolution, known-account registry).
 
 ---
 
@@ -552,13 +567,18 @@ The global error handler maps all errors to clean HTTP responses:
 
 ## Scripts
 
-| Script        | Command               | Description                                   |
-| ------------- | --------------------- | --------------------------------------------- |
-| Dev server    | `npm run dev`         | Start with hot-reload via `tsx watch`         |
-| Build         | `npm run build`       | Compile TypeScript to `dist/`                 |
-| Start         | `npm run start`       | Run compiled production build                 |
-| Seed          | `npm run seed`        | Seed database with branches, users, feedbacks |
-| Lint          | `npm run lint`        | TypeScript type check (`tsc --noEmit`)        |
-| Prisma Studio | `npx prisma studio`   | Visual DB browser at `localhost:5555`         |
+| Script        | Command                       | Description                                              |
+| ------------- | ----------------------------- | -------------------------------------------------------- |
+| Dev server    | `npm run dev`                 | Start with hot-reload via `tsx watch`                    |
+| Build         | `npm run build`               | Compile TypeScript to `dist/`                            |
+| Start         | `npm run start`               | Run compiled production build                            |
+| Seed (dev)    | `npm run seed`                | ⚠️ Wipes + seeds database (dev only)                     |
+| Executives    | `npm run ensure:executives`   | Upsert COO/MD accounts (prod-safe)                       |
+| Inventory     | `npm run seed:inventory`      | Idempotent catalog sync (prod-safe)                      |
+| Rotate pw     | `npm run passwords:rotate`    | Re-hash seed accounts, revoke sessions                   |
+| DB status     | `npm run db:status`           | Show pending migrations (read-only)                      |
+| DB deploy     | `npm run db:deploy`           | Apply pending migrations                                 |
+| Typecheck     | `npm run typecheck`           | TypeScript type check (`tsc --noEmit`)                   |
+| Prisma Studio | `npx prisma studio`           | Visual DB browser at `localhost:5555`                    |
 | DB push       | `npx prisma db push`  | Sync schema to DB (dev, no migrations)        |
 | Generate      | `npx prisma generate` | Regenerate Prisma client after schema changes |

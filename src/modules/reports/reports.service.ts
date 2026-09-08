@@ -175,7 +175,6 @@ export async function exportManagerReportsExcel(branchId?: number, startDate?: s
     include: {
       branch: { select: { name: true, code: true } },
       complaints: true,
-      bpCpEntries: true,
     },
     orderBy: { reportDate: "desc" },
     take: env.report_export_limit,
@@ -194,7 +193,6 @@ export async function exportManagerReportsExcel(branchId?: number, startDate?: s
     { header: "Briefing Points", key: "briefingPoints", width: 40 },
     { header: "Daily Learnings", key: "dailyLearnings", width: 40 },
     { header: "Complaints", key: "complaintCount", width: 10 },
-    { header: "BP/CP Entries", key: "bpCpCount", width: 12 },
   ];
   for (const r of reports) {
     summarySheet.addRow({
@@ -207,7 +205,6 @@ export async function exportManagerReportsExcel(branchId?: number, startDate?: s
       briefingPoints: r.briefingPoints,
       dailyLearnings: r.dailyLearnings,
       complaintCount: r.complaints.length,
-      bpCpCount: r.bpCpEntries.length,
     });
   }
   summarySheet.getRow(1).font = { bold: true };

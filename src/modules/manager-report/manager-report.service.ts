@@ -3,7 +3,7 @@ import { Prisma } from "../../../generated/prisma/client";
 import { prisma } from "../../lib/prisma";
 import { appError } from "../../utils/appError";
 import { transformPagination, buildMetadata } from "../../utils/queryBuilder";
-import { formatDateOnly, toDateOnly, toEndOfDay, getTodayString, getYesterdayString } from "../../utils/dateHelpers";
+import { formatDateOnly, toDateOnly, toEndOfDay } from "../../utils/dateHelpers";
 import { publishDataChanged } from "../../lib/realtime";
 import { withCache, invalidateByPrefix } from "../../lib/cache";
 import * as notificationService from "../notification/notification.service";
@@ -26,7 +26,6 @@ const REPORT_INCLUDE = {
   branch: { select: { id: true, name: true, code: true } },
   approvedBy: { select: { id: true, name: true } },
   complaints: true,
-  bpCpEntries: true,
   comments: {
     orderBy: { createdAt: "asc" as const },
     include: { user: { select: { id: true, name: true, role: true } } },
@@ -52,7 +51,6 @@ async function invalidateReportsListCaches(): Promise<void> {
 function formatReport<T extends { reportDate: Date }>(report: T): T {
   return { ...report, reportDate: formatDateOnly(report.reportDate) } as T;
 }
-
 function resolveBranchId(payloadBranchId: number | undefined, user: AuthUser): number {
   if (user.role === "BRANCH_MANAGER") {
     if (!user.branchId) throw appError("No branch is assigned to your account", httpStatus.FORBIDDEN);
@@ -65,17 +63,46 @@ function resolveBranchId(payloadBranchId: number | undefined, user: AuthUser): n
   return payloadBranchId;
 }
 
+interface ComplaintDraftInput {
+  guestName?: string;
+  mobile?: string;
+  email?: string | null;
+  complaintDetails?: string;
+  serviceProviderName?: string;
+  responsiblePerson?: string;
+  actionTaken?: string;
+  solution?: string;
+}
+
+/**
+ * Normalize complaint drafts for storage. Every field is optional, so
+ * fully-empty rows (added by accident) are dropped instead of saved.
+ */
+function toComplaintRows(complaints: ComplaintDraftInput[] | undefined) {
+  return (complaints ?? [])
+    .map((c) => ({
+      guestName: c.guestName ?? "",
+      mobile: c.mobile ?? "",
+      email: c.email ?? null,
+      complaintDetails: c.complaintDetails ?? "",
+      serviceProviderName: c.serviceProviderName ?? "",
+      responsiblePerson: c.responsiblePerson ?? "",
+      actionTaken: c.actionTaken ?? "",
+      solution: c.solution ?? "",
+    }))
+    .filter(
+      (c) =>
+        c.guestName !== "" ||
+        c.mobile !== "" ||
+        c.complaintDetails !== "" ||
+        c.actionTaken !== "" ||
+        c.solution !== "",
+    );
+}
+
 export async function createReport(payload: CreateManagerReportInput, user: AuthUser) {
   const branchId = resolveBranchId(payload.branchId, user);
   const reportDate = toDateOnly(payload.reportDate);
-
-  if (user.role === "BRANCH_MANAGER") {
-    const today = toDateOnly(getTodayString());
-    const yesterday = toDateOnly(getYesterdayString());
-    if (reportDate.getTime() < yesterday.getTime() || reportDate.getTime() > today.getTime()) {
-      throw appError("Manager reports can only be submitted for today or yesterday", httpStatus.BAD_REQUEST);
-    }
-  }
 
   const existing = await prisma.managerReport.findUnique({
     where: { branchId_reportDate: { branchId, reportDate } },
@@ -85,24 +112,7 @@ export async function createReport(payload: CreateManagerReportInput, user: Auth
     throw appError("A manager report already exists for this branch on this date", httpStatus.CONFLICT);
   }
 
-  const complaintsData = (payload.complaints ?? []).map((c) => ({
-    guestName: c.guestName,
-    mobile: c.mobile,
-    email: c.email ?? null,
-    complaintDetails: c.complaintDetails,
-    serviceProviderName: c.serviceProviderName,
-    responsiblePerson: c.responsiblePerson,
-    actionTaken: c.actionTaken,
-    solution: c.solution,
-  }));
-  const bpCpData = (payload.bpCpEntries ?? []).map((e) => ({
-    entryType: e.entryType,
-    guestName: e.guestName,
-    mobile: e.mobile,
-    totalPax: e.totalPax ?? null,
-    comment: e.comment ?? null,
-  }));
-
+  const complaintsData = toComplaintRows(payload.complaints);
   const baseData: Prisma.ManagerReportUncheckedCreateInput = {
     branchId,
     managerName: payload.managerName,
@@ -113,7 +123,6 @@ export async function createReport(payload: CreateManagerReportInput, user: Auth
     dailyLearnings: payload.dailyLearnings ?? "",
     createdByUserId: user.id,
     complaints: { create: complaintsData },
-    bpCpEntries: { create: bpCpData },
   };
 
   if (existing && existing.isDeleted) {
@@ -124,7 +133,6 @@ export async function createReport(payload: CreateManagerReportInput, user: Auth
       approvedByUserId: null,
       approvedAt: null,
       complaints: { deleteMany: {}, create: complaintsData },
-      bpCpEntries: { deleteMany: {}, create: bpCpData },
     };
     const report = await prisma.$transaction((tx) =>
       tx.managerReport.update({
@@ -195,7 +203,7 @@ export async function getPaginatedReports(query: ManagerReportQueryInput, user: 
         ...pagination,
         include: {
           branch: { select: { id: true, name: true, code: true } },
-          _count: { select: { complaints: true, bpCpEntries: true } },
+          _count: { select: { complaints: true } },
         },
       }),
       prisma.managerReport.count({ where }),
@@ -243,13 +251,6 @@ export async function updateReport(id: number, payload: UpdateManagerReportInput
     if (existing.approvalStatus === "APPROVED") {
       throw appError("Approved reports cannot be edited", httpStatus.CONFLICT);
     }
-    if (existing.approvalStatus !== "REJECTED") {
-      const today = toDateOnly(getTodayString());
-      const yesterday = toDateOnly(getYesterdayString());
-      if (existing.reportDate.getTime() < yesterday.getTime() || existing.reportDate.getTime() > today.getTime()) {
-        throw appError("Manager reports can only be edited today or yesterday", httpStatus.FORBIDDEN);
-      }
-    }
   }
 
   const targetDate = payload.reportDate !== undefined ? toDateOnly(payload.reportDate) : existing.reportDate;
@@ -275,31 +276,9 @@ export async function updateReport(id: number, payload: UpdateManagerReportInput
   if (payload.complaints !== undefined) {
     data.complaints = {
       deleteMany: {},
-      create: payload.complaints.map((c) => ({
-        guestName: c.guestName,
-        mobile: c.mobile,
-        email: c.email ?? null,
-        complaintDetails: c.complaintDetails,
-        serviceProviderName: c.serviceProviderName,
-        responsiblePerson: c.responsiblePerson,
-        actionTaken: c.actionTaken,
-        solution: c.solution,
-      })),
+      create: toComplaintRows(payload.complaints),
     };
   }
-  if (payload.bpCpEntries !== undefined) {
-    data.bpCpEntries = {
-      deleteMany: {},
-      create: payload.bpCpEntries.map((e) => ({
-        entryType: e.entryType,
-        guestName: e.guestName,
-        mobile: e.mobile,
-        totalPax: e.totalPax ?? null,
-        comment: e.comment ?? null,
-      })),
-    };
-  }
-
   if (user.role === "BRANCH_MANAGER" && existing.approvalStatus === "REJECTED") {
     data.approvalStatus = "PENDING";
     data.approvedByUserId = null;
@@ -332,13 +311,12 @@ export async function deleteReport(id: number, user: AuthUser) {
     select: { branchId: true, isDeleted: true, approvalStatus: true },
   });
   if (!existing || existing.isDeleted) throw appError("Manager report not found", httpStatus.NOT_FOUND);
-  if (user.role === "BRANCH_MANAGER") {
-    if (existing.branchId !== user.branchId) {
-      throw appError("Forbidden: You can only delete reports for your own branch", httpStatus.FORBIDDEN);
-    }
-    if (existing.approvalStatus === "APPROVED") {
-      throw appError("Approved reports cannot be deleted", httpStatus.CONFLICT);
-    }
+  if (user.role === "BRANCH_MANAGER" && existing.branchId !== user.branchId) {
+    throw appError("Forbidden: You can only delete reports for your own branch", httpStatus.FORBIDDEN);
+  }
+  // Approved reports are protected — only Super Admin can remove them.
+  if (existing.approvalStatus === "APPROVED" && user.role !== "SUPER_ADMIN") {
+    throw appError("Forbidden: Only Super Admin can delete approved reports", httpStatus.FORBIDDEN);
   }
   const report = await prisma.managerReport.update({
     where: { id },
@@ -357,6 +335,10 @@ export async function setReportApproval(id: number, payload: ApprovalStatusInput
   if (!existing || existing.isDeleted) throw appError("Manager report not found", httpStatus.NOT_FOUND);
   if (existing.approvalStatus === "APPROVED") throw appError("This report is already approved", httpStatus.CONFLICT);
 
+  // Stamp the approver's signature image on approval (e.g. COO sign).
+  // Snapshotted onto the record so it survives later profile changes.
+  const approver = await prisma.user.findUnique({ where: { id: user.id }, select: { signatureUrl: true } });
+
   const report = await prisma.managerReport.update({
     where: { id },
     data: {
@@ -364,6 +346,7 @@ export async function setReportApproval(id: number, payload: ApprovalStatusInput
       approvedByUserId: user.id,
       approvedAt: new Date(),
       approvalComment: payload.approvalStatus === "REJECTED" ? (payload.approvalComment || null) : null,
+      approvedSignature: payload.approvalStatus === "APPROVED" ? (approver?.signatureUrl ?? null) : null,
     },
     include: REPORT_INCLUDE,
   });

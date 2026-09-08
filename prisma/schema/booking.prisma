@@ -1,0 +1,75 @@
+model Booking {
+  id               Int              @id @default(autoincrement())
+  bookingNumber    String           @unique @map("booking_number")
+  branchId         Int              @map("branch_id")
+  guestName        String           @map("guest_name")
+  guestMobile      String           @map("guest_mobile")
+  partyDate        DateTime         @map("party_date")
+  partyType        BookingPartyType @map("party_type")
+  initialPax       Int              @map("initial_pax")
+  expectedPax      Int              @map("expected_pax")
+  actualPax        Int?             @map("actual_pax")
+  status           BookingStatus    @default(TENTATIVE)
+  remarks          String?          @db.Text
+  confirmedByUserId Int?            @map("confirmed_by_user_id")
+  confirmedAt      DateTime?        @map("confirmed_at")
+  cancelledByUserId Int?            @map("cancelled_by_user_id")
+  cancelledAt      DateTime?        @map("cancelled_at")
+  cancellationReason String?        @map("cancellation_reason") @db.Text
+  completedByUserId Int?            @map("completed_by_user_id")
+  completedAt      DateTime?        @map("completed_at")
+  createdByUserId  Int              @map("created_by_user_id")
+  updatedByUserId  Int?             @map("updated_by_user_id")
+  isDeleted        Boolean          @default(false) @map("is_deleted")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  branch      Branch                 @relation(fields: [branchId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdBy   User                   @relation("BookingCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  confirmedBy User?                  @relation("BookingConfirmedBy", fields: [confirmedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  cancelledBy User?                  @relation("BookingCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  completedBy User?                  @relation("BookingCompletedBy", fields: [completedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  adjustments   BookingPaxAdjustment[]
+  statusHistory BookingStatusHistory[]
+
+  @@index([branchId, partyDate])
+  @@index([partyDate])
+  @@index([status])
+  @@index([isDeleted])
+  @@map("bookings")
+}
+
+model BookingPaxAdjustment {
+  id                Int                @id @default(autoincrement())
+  bookingId         Int                @map("booking_id")
+  type              PaxAdjustmentType
+  quantity          Int                @map("quantity")
+  previousExpectedPax Int              @map("previous_expected_pax")
+  newExpectedPax    Int                @map("new_expected_pax")
+  reason            String?            @db.Text
+  createdByUserId   Int                @map("created_by_user_id")
+  createdAt         DateTime           @default(now()) @map("created_at")
+
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdBy User    @relation("BookingAdjustmentCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([bookingId])
+  @@map("booking_pax_adjustments")
+}
+
+model BookingStatusHistory {
+  id          Int            @id @default(autoincrement())
+  bookingId   Int            @map("booking_id")
+  fromStatus  BookingStatus? @map("from_status")
+  toStatus    BookingStatus  @map("to_status")
+  reason      String?        @db.Text
+  changedByUserId Int        @map("changed_by_user_id")
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  changedBy User    @relation("BookingStatusChangedBy", fields: [changedByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([bookingId])
+  @@map("booking_status_history")
+}

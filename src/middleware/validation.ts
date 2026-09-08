@@ -43,7 +43,3 @@ export const validateSchema = (target: ValidationTarget) => {
 export function parsedQuery<T>(res: Response): T {
   return res.locals.validatedQuery as T;
 }
-
-export function parsedBody<T>(res: Response): T {
-  return res.locals.validatedBody as T;
-}

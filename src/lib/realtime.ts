@@ -6,6 +6,8 @@ export const Role = {
   SUPER_ADMIN: "SUPER_ADMIN",
   ADMIN: "ADMIN",
   BRANCH_MANAGER: "BRANCH_MANAGER",
+  COO: "COO",
+  MD: "MD",
 } as const;
 
 export type Role = (typeof Role)[keyof typeof Role];
@@ -101,8 +103,15 @@ export class RealtimeHub {
     sub: RealtimeSubscriber,
     event: Omit<RealtimeEvent, "timestamp"> & RealtimeScope,
   ): boolean {
-    // Admins see everything.
-    if (sub.role === Role.SUPER_ADMIN || sub.role === Role.ADMIN) return true;
+    // Admins and executives see everything.
+    if (
+      sub.role === Role.SUPER_ADMIN ||
+      sub.role === Role.ADMIN ||
+      sub.role === Role.COO ||
+      sub.role === Role.MD
+    ) {
+      return true;
+    }
 
     // Branch managers: global events + events for their own branch.
     if (event.type === "global") return true;

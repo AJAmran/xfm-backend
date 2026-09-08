@@ -9,9 +9,10 @@ model ManagerReport {
   dailyLearnings       String         @map("daily_learnings") @db.Text
   createdByUserId      Int            @map("created_by_user_id")
   approvalStatus       ApprovalStatus @default(PENDING) @map("approval_status")
-  approvedByUserId     Int?           @map("approved_by_user_id")
-  approvedAt           DateTime?      @map("approved_at")
-  approvalComment      String?        @map("approval_comment") @db.Text
+  approvedByUserId     Int?            @map("approved_by_user_id")
+  approvedAt           DateTime?       @map("approved_at")
+  approvalComment      String?         @map("approval_comment") @db.Text
+  approvedSignature    String?         @map("approved_signature")
   isDeleted            Boolean        @default(false) @map("is_deleted")
   createdAt            DateTime       @default(now()) @map("created_at")
   updatedAt            DateTime       @updatedAt @map("updated_at")

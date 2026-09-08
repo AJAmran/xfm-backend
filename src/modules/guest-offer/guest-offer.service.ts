@@ -109,7 +109,7 @@ export async function getPaginatedDiscountLogs(query: GuestOfferQueryInput, user
       prisma.guestDiscountLog.findMany({
         where,
         ...pagination,
-        include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } } },
+        include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } }, approvedBy: { select: { id: true, name: true } } },
       }),
       prisma.guestDiscountLog.count({ where }),
     ]);
@@ -121,7 +121,7 @@ export async function getPaginatedDiscountLogs(query: GuestOfferQueryInput, user
 export async function getDiscountLogById(id: number, user: AuthUser) {
   const log = await prisma.guestDiscountLog.findUnique({
     where: { id },
-    include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } } },
+    include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } }, approvedBy: { select: { id: true, name: true } } },
   });
   if (!log || log.isDeleted) throw appError("Discount log not found", httpStatus.NOT_FOUND);
   if (isManager(user) && log.branchId !== user.branchId) {
@@ -156,7 +156,7 @@ export async function updateDiscountLog(id: number, payload: GuestDiscountUpdate
   const log = await prisma.guestDiscountLog.update({
     where: { id },
     data,
-    include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } } },
+    include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } }, approvedBy: { select: { id: true, name: true } } },
   });
   publishDataChanged("guest-offer.discount-updated", { type: "branch", branchId: existing.branchId });
   await invalidateGuestOfferCaches();
@@ -168,6 +168,8 @@ export async function setDiscountLogApproval(id: number, payload: ApprovalStatus
   if (!existing || existing.isDeleted) throw appError("Discount log not found", httpStatus.NOT_FOUND);
   if (existing.approvalStatus === "APPROVED") throw appError("This log is already approved", httpStatus.CONFLICT);
 
+  const approver = await prisma.user.findUnique({ where: { id: user.id }, select: { signatureUrl: true } });
+
   const log = await prisma.guestDiscountLog.update({
     where: { id },
     data: {
@@ -175,8 +177,9 @@ export async function setDiscountLogApproval(id: number, payload: ApprovalStatus
       verifiedByUserId: user.id,
       approvedByUserId: user.id,
       approvedAt: new Date(),
+      approvedSignature: payload.approvalStatus === "APPROVED" ? (approver?.signatureUrl ?? null) : null,
     },
-    include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } } },
+    include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } }, approvedBy: { select: { id: true, name: true } } },
   });
   publishDataChanged("guest-offer.discount-approved", { type: "branch", branchId: existing.branchId });
   await invalidateGuestOfferCaches();
@@ -239,7 +242,7 @@ export async function getPaginatedEntertainmentLogs(query: GuestOfferQueryInput,
       prisma.guestEntertainmentLog.findMany({
         where,
         ...pagination,
-        include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } } },
+        include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } }, approvedBy: { select: { id: true, name: true } } },
       }),
       prisma.guestEntertainmentLog.count({ where }),
     ]);
@@ -251,7 +254,7 @@ export async function getPaginatedEntertainmentLogs(query: GuestOfferQueryInput,
 export async function getEntertainmentLogById(id: number, user: AuthUser) {
   const log = await prisma.guestEntertainmentLog.findUnique({
     where: { id },
-    include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } } },
+    include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } }, approvedBy: { select: { id: true, name: true } } },
   });
   if (!log || log.isDeleted) throw appError("Entertainment log not found", httpStatus.NOT_FOUND);
   if (isManager(user) && log.branchId !== user.branchId) {
@@ -281,7 +284,7 @@ export async function updateEntertainmentLog(id: number, payload: GuestEntertain
   const log = await prisma.guestEntertainmentLog.update({
     where: { id },
     data,
-    include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } } },
+    include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } }, approvedBy: { select: { id: true, name: true } } },
   });
   publishDataChanged("guest-offer.entertainment-updated", { type: "branch", branchId: existing.branchId });
   await invalidateGuestOfferCaches();
@@ -293,6 +296,8 @@ export async function setEntertainmentLogApproval(id: number, payload: ApprovalS
   if (!existing || existing.isDeleted) throw appError("Entertainment log not found", httpStatus.NOT_FOUND);
   if (existing.approvalStatus === "APPROVED") throw appError("This log is already approved", httpStatus.CONFLICT);
 
+  const approver = await prisma.user.findUnique({ where: { id: user.id }, select: { signatureUrl: true } });
+
   const log = await prisma.guestEntertainmentLog.update({
     where: { id },
     data: {
@@ -300,8 +305,9 @@ export async function setEntertainmentLogApproval(id: number, payload: ApprovalS
       verifiedByUserId: user.id,
       approvedByUserId: user.id,
       approvedAt: new Date(),
+      approvedSignature: payload.approvalStatus === "APPROVED" ? (approver?.signatureUrl ?? null) : null,
     },
-    include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } } },
+    include: { branch: { select: { id: true, name: true, code: true } }, offeredBy: { select: { id: true, name: true } }, approvedBy: { select: { id: true, name: true } } },
   });
   publishDataChanged("guest-offer.entertainment-approved", { type: "branch", branchId: existing.branchId });
   await invalidateGuestOfferCaches();

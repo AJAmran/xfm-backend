@@ -12,7 +12,7 @@ import { Role } from "../../../generated/prisma/enums";
 
 const router = Router();
 
-router.use(authGuard(Role.SUPER_ADMIN, Role.ADMIN, Role.BRANCH_MANAGER));
+router.use(authGuard(Role.SUPER_ADMIN, Role.ADMIN, Role.BRANCH_MANAGER, Role.COO, Role.MD));
 
 router.get("/daily", validateSchema({ query: reportsQuerySchema }), reportsController.daily);
 router.get("/weekly", validateSchema({ query: reportsQuerySchema }), reportsController.weekly);

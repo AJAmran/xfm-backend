@@ -1062,7 +1062,7 @@ All endpoints require `SUPER_ADMIN`, `ADMIN`, or `BRANCH_MANAGER`.
 
 > **Branch Manager Scope:** `BRANCH_MANAGER` requests are automatically scoped to their own branch. A `BRANCH_MANAGER` may only edit or delete a report on the day it was created (`reportDate === today`). Writes that would move a report to a different branch are forbidden.
 
-**Nested records:** A report can include `complaints` (guest complaints) and `bpCpEntries` (briefing points / carry-over points). Both are created/updated atomically with the report inside a DB transaction.
+**Nested records:** A report can include `complaints` (guest complaints). These are created/updated atomically with the report inside a DB transaction.
 
 ---
 
@@ -1091,14 +1091,6 @@ All endpoints require `SUPER_ADMIN`, `ADMIN`, or `BRANCH_MANAGER`.
       "actionTaken": "Apologized and expedited order.",
       "solution": "Complimentary dessert provided."
     }
-  ],
-  "bpCpEntries": [
-    {
-      "entryType": "TOMORROW",
-      "guestName": "Nusrat Jahan",
-      "mobile": "01822222222",
-      "comment": "VIP booking for tomorrow."
-    }
   ]
 }
 ```
@@ -1112,9 +1104,8 @@ All endpoints require `SUPER_ADMIN`, `ADMIN`, or `BRANCH_MANAGER`.
 | `briefingPoints` | string | No | Briefing points |
 | `dailyLearnings` | string | No | Daily learnings |
 | `complaints` | array (max 50) | No | Guest complaints (see above) |
-| `bpCpEntries` | array (max 50) | No | BP/CP entries (`entryType`: `TODAY` \| `TOMORROW`) |
 
-**Response (201)** — Created report with nested `complaints` and `bpCpEntries`
+**Response (201)** — Created report with nested `complaints`
 
 **Errors:** 404 (`Branch not found`), 409 (`A report already exists for this branch on {date}`), 422
 
@@ -1136,7 +1127,7 @@ All endpoints require `SUPER_ADMIN`, `ADMIN`, or `BRANCH_MANAGER`.
 | `startDate` | string `YYYY-MM-DD` | — | Start date filter |
 | `endDate` | string `YYYY-MM-DD` | — | End date filter |
 
-**Response (200)** — Paginated list (standard envelope) with nested `branch`, `complaints`, `bpCpEntries`
+**Response (200)** — Paginated list (standard envelope) with nested `branch`, `complaints`
 
 ---
 

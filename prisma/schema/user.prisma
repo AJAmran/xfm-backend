@@ -5,6 +5,7 @@ model User {
   email     String   @unique
   password  String
   role      Role
+  signatureUrl String? @map("signature_url")
   isActive  Boolean  @default(true) @map("is_active")
   isDeleted Boolean  @default(false) @map("is_deleted")
   tokenVersion Int  @default(0) @map("token_version")
@@ -24,6 +25,12 @@ model User {
   approvedEntertainmentLogs       GuestEntertainmentLog[] @relation("ApprovedEntertainmentLogs")
   submittedInventoryStatements    MonthlyInventoryStatement[] @relation("SubmittedInventoryStatements")
   notifications                   Notification[]             @relation("ActorNotifications")
+  createdBookings                 Booking[]                  @relation("BookingCreatedBy")
+  confirmedBookings               Booking[]                  @relation("BookingConfirmedBy")
+  cancelledBookings               Booking[]                  @relation("BookingCancelledBy")
+  completedBookings               Booking[]                  @relation("BookingCompletedBy")
+  bookingAdjustments              BookingPaxAdjustment[]     @relation("BookingAdjustmentCreatedBy")
+  bookingStatusChanges            BookingStatusHistory[]     @relation("BookingStatusChangedBy")
 
   @@index([email, role])
   @@index([branchId])
