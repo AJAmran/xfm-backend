@@ -1,22 +1,22 @@
 import { z } from "zod";
 
 export const createBranchSchema = z.object({
-  name: z.string().trim().min(1),
-  code: z.string().trim().min(1),
-  address: z.string().trim().min(1),
-  phone: z.string().trim().optional(),
-  latitude: z.number().min(-90).max(90),
-  longitude: z.number().min(-180).max(180),
+  name: z.string().trim().min(1, "Branch name is required"),
+  code: z.string().trim().min(1, "Branch code is required"),
+  address: z.string().trim().min(1, "Address is required"),
+  phone: z.string().trim().nullable().optional(),
+  latitude: z.number({ error: "Latitude must be a number" }).min(-90, "Latitude must be between -90 and 90").max(90, "Latitude must be between -90 and 90"),
+  longitude: z.number({ error: "Longitude must be a number" }).min(-180, "Longitude must be between -180 and 180").max(180, "Longitude must be between -180 and 180"),
   capacity: z.number().int().positive().optional().nullable(),
 });
 
 export const updateBranchSchema = z.object({
-  name: z.string().trim().min(1).optional(),
-  code: z.string().trim().min(1).optional(),
-  address: z.string().trim().min(1).optional(),
+  name: z.string().trim().min(1, "Branch name is required").optional(),
+  code: z.string().trim().min(1, "Branch code is required").optional(),
+  address: z.string().trim().min(1, "Address is required").optional(),
   phone: z.string().trim().nullable().optional(),
-  latitude: z.number().min(-90).max(90).optional(),
-  longitude: z.number().min(-180).max(180).optional(),
+  latitude: z.number({ error: "Latitude must be a number" }).min(-90, "Latitude must be between -90 and 90").max(90, "Latitude must be between -90 and 90").optional(),
+  longitude: z.number({ error: "Longitude must be a number" }).min(-180, "Longitude must be between -180 and 180").max(180, "Longitude must be between -180 and 180").optional(),
   capacity: z.number().int().positive().nullable().optional(),
   isActive: z.boolean().optional(),
 });
