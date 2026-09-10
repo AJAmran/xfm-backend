@@ -1,12 +1,6 @@
 import { INVENTORY_CATALOG } from "./inventory-catalog";
 import { runScript } from "./seed-utils";
 
-// Idempotent sync of the inventory catalog into an EXISTING database.
-// Unlike `npm run seed`, this never wipes data. It only:
-//   - creates missing categories / items
-//   - re-syncs sortOrder on existing rows
-// Already-deleted (soft-deleted) rows are left untouched.
-
 async function main() {
   await runScript("📦 Syncing inventory catalog...", async (prisma) => {
     let categoriesCreated = 0;

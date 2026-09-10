@@ -2,7 +2,12 @@ import { z } from "zod";
 
 const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a date in YYYY-MM-DD format");
 
-const mobile = z.string().trim().min(6, "Mobile number is required").max(20);
+const mobile = z
+  .string()
+  .trim()
+  .min(6, "Mobile number is required")
+  .max(20)
+  .regex(/^[+\d][\d\s-]{5,19}$/, "Enter a valid phone number (digits, spaces, dashes)");
 
 export const createBookingSchema = z.object({
   branchId: z.number().int().positive(),
@@ -12,6 +17,8 @@ export const createBookingSchema = z.object({
   partyType: z.enum(["LUNCH", "DINNER"]),
   initialPax: z.number().int().min(1, "Initial pax must be at least 1").max(100000),
   remarks: z.string().trim().max(2000).optional().nullable(),
+  // Managers may book directly as CONFIRMED (skips the tentative step).
+  status: z.enum(["TENTATIVE", "CONFIRMED"]).optional().default("TENTATIVE"),
 }).strict();
 
 /** Initial pax is intentionally absent — it is immutable after creation. */
@@ -26,7 +33,7 @@ export const updateBookingSchema = z.object({
 export const bookingQuerySchema = z.object({
   page: z.string().optional().default("1"),
   limit: z.string().optional().default("10"),
-  sortBy: z.string().optional().default("partyDate"),
+  sortBy: z.enum(["partyDate", "createdAt", "updatedAt", "guestName", "status", "expectedPax"]).optional().default("partyDate"),
   sortOrder: z.enum(["asc", "desc"]).optional().default("asc"),
   branchId: z.string().optional(),
   partyDate: z.string().optional(),
@@ -35,6 +42,7 @@ export const bookingQuerySchema = z.object({
   partyType: z.enum(["LUNCH", "DINNER"]).optional(),
   status: z.enum(["TENTATIVE", "CONFIRMED", "CANCELLED", "COMPLETED"]).optional(),
   search: z.string().optional(),
+  missingActual: z.enum(["true", "false"]).optional(),
 }).strict();
 
 export const bookingReportQuerySchema = z.object({

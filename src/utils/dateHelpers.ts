@@ -8,6 +8,19 @@ export function getTodayString(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** Returns today's date (YYYY-MM-DD) in Asia/Dhaka — the business timezone.
+ *  Server clocks run UTC, which lags local time by 6h; event-day rules must
+ *  use Dhaka time or managers get blocked after midnight local. */
+export function getDhakaTodayString(timeZone = "Asia/Dhaka"): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  return parts;
+}
+
 /** Returns yesterday's date (YYYY-MM-DD) in UTC. */
 export function getYesterdayString(): string {
   const date = new Date();

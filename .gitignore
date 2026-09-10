@@ -26,3 +26,6 @@ Thumbs.db
 
 # Test output
 coverage/
+
+# Local report PDF dry-runs (npm run reports:pdf)
+tmp/

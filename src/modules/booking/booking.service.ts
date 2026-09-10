@@ -9,7 +9,7 @@ import {
   formatDateOnly,
   toDateOnly,
   toEndOfDay,
-  getTodayString,
+  getDhakaTodayString,
   toMonthStart,
   toNextMonthStart,
 } from "../../utils/dateHelpers";
@@ -111,10 +111,16 @@ export async function createBooking(payload: CreateBookingInput, user: AuthUser)
 
   const partyDate = toDateOnly(payload.partyDate);
 
+  // No backdated parties — a booking starts today or later (Dhaka time).
+  if (payload.partyDate < getDhakaTodayString()) {
+    throw appError("Bookings cannot be created for past dates", httpStatus.BAD_REQUEST);
+  }
+
   // Retry on booking-number collision (P2002) — random suffix makes this rare.
   let lastError: unknown = null;
   for (let attempt = 0; attempt < 5; attempt += 1) {
     try {
+      const directConfirm = payload.status === "CONFIRMED";
       const booking = await prisma.booking.create({
         data: {
           bookingNumber: generateBookingNumber(payload.partyDate),
@@ -127,8 +133,16 @@ export async function createBooking(payload: CreateBookingInput, user: AuthUser)
           expectedPax: payload.initialPax,
           remarks: payload.remarks ?? null,
           createdByUserId: user.id,
+          status: directConfirm ? "CONFIRMED" : "TENTATIVE",
+          confirmedByUserId: directConfirm ? user.id : null,
+          confirmedAt: directConfirm ? new Date() : null,
           statusHistory: {
-            create: { fromStatus: null, toStatus: "TENTATIVE", changedByUserId: user.id },
+            create: directConfirm
+              ? [
+                  { fromStatus: null, toStatus: "TENTATIVE", changedByUserId: user.id },
+                  { fromStatus: "TENTATIVE", toStatus: "CONFIRMED", changedByUserId: user.id },
+                ]
+              : { fromStatus: null, toStatus: "TENTATIVE", changedByUserId: user.id },
           },
         },
         include: BOOKING_INCLUDE,
@@ -156,6 +170,9 @@ export async function getPaginatedBookings(query: BookingQueryInput, user: AuthU
     else if (query.branchId) where.branchId = Number(query.branchId);
     if (query.partyType) where.partyType = query.partyType;
     if (query.status) where.status = query.status;
+    // Overdue closure: past CONFIRMED bookings still missing actual pax.
+    if (query.missingActual === "true") where.actualPax = null;
+    else if (query.missingActual === "false") where.actualPax = { not: null };
     if (query.search) {
       where.OR = [
         { guestName: { contains: query.search } },
@@ -208,7 +225,12 @@ export async function updateBooking(id: number, payload: UpdateBookingInput, use
   const data: Prisma.BookingUpdateInput = { updatedByUserId: user.id };
   if (payload.guestName !== undefined) data.guestName = payload.guestName;
   if (payload.guestMobile !== undefined) data.guestMobile = payload.guestMobile;
-  if (payload.partyDate !== undefined) data.partyDate = toDateOnly(payload.partyDate);
+  if (payload.partyDate !== undefined) {
+    if (payload.partyDate < getDhakaTodayString()) {
+      throw appError("Bookings cannot be moved to past dates", httpStatus.BAD_REQUEST);
+    }
+    data.partyDate = toDateOnly(payload.partyDate);
+  }
   if (payload.partyType !== undefined) data.partyType = payload.partyType;
   if (payload.remarks !== undefined) data.remarks = payload.remarks;
 
@@ -339,6 +361,11 @@ export async function setBookingStatus(id: number, payload: BookingStatusInput, 
   if (payload.status === "COMPLETED" && existing.actualPax == null) {
     throw appError("Enter actual pax before completing the booking", httpStatus.BAD_REQUEST);
   }
+  // A party can only be completed once its day has arrived (Dhaka time) —
+  // no early completions. Past-due bookings stay completable (grace).
+  if (payload.status === "COMPLETED" && formatDateOnly(existing.partyDate) > getDhakaTodayString()) {
+    throw appError("Bookings can only be completed on or after the party date", httpStatus.BAD_REQUEST);
+  }
 
   const data: Prisma.BookingUncheckedUpdateInput = { status: payload.status, updatedByUserId: user.id };
   if (payload.status === "CONFIRMED") {
@@ -397,7 +424,7 @@ export interface BookingDashboardFilters {
 
 export async function getDashboard(user: AuthUser, filters: BookingDashboardFilters = {}) {
   return withCache(bookingsKey("dashboard", filters, user), async () => {
-    const today = getTodayString();
+    const today = getDhakaTodayString();
     const branchId = isManager(user) ? requireManagerBranch(user) : filters.branchId ? Number(filters.branchId) : undefined;
 
     const base: Prisma.BookingWhereInput = { isDeleted: false };
@@ -446,7 +473,7 @@ export async function getUpcoming(user: AuthUser, limit = 20, branchId?: number)
   const where: Prisma.BookingWhereInput = {
     isDeleted: false,
     status: { in: ["TENTATIVE", "CONFIRMED"] },
-    partyDate: { gte: toDateOnly(getTodayString()) },
+    partyDate: { gte: toDateOnly(getDhakaTodayString()) },
   };
   if (effectiveBranch) where.branchId = effectiveBranch;
   const bookings = await prisma.booking.findMany({
@@ -467,7 +494,7 @@ export interface BookingCalendarParams {
 }
 
 export async function getCalendar(user: AuthUser, params: BookingCalendarParams) {
-  const today = getTodayString();
+  const today = getDhakaTodayString();
   const start = params.startDate ?? today;
   const end = params.endDate ?? today;
   const where: Prisma.BookingWhereInput = {
@@ -492,7 +519,7 @@ export async function getCalendar(user: AuthUser, params: BookingCalendarParams)
 
 export async function getWarnings(user: AuthUser, branchId?: number): Promise<{ date: string; warnings: BookingWarning[] }> {
   return withCache(bookingsKey("warnings", { branchId }, user), async () => {
-    const today = getTodayString();
+    const today = getDhakaTodayString();
     const todayDate = toDateOnly(today);
     const past = new Date(todayDate.getTime() - 7 * 86400000);
     const future = new Date(todayDate.getTime() + 8 * 86400000);
@@ -575,6 +602,8 @@ export interface BookingReportResult {
     dinner: number;
     lunchPax: number;
     dinnerPax: number;
+    lunchActualPax: number;
+    dinnerActualPax: number;
     initialPax: number;
     expectedPax: number;
     actualPax: number;
@@ -596,13 +625,13 @@ async function aggregateReport(where: Prisma.BookingWhereInput, startDate: strin
       _count: { _all: true },
       _sum: { initialPax: true, expectedPax: true, actualPax: true },
     }),
-    // Lunch/Dinner split per branch: party counts + expected pax
+    // Lunch/Dinner split per branch: party counts + expected + actual pax
     // (single grouped query, bounded by branches × 2)
     prisma.booking.groupBy({
       by: ["branchId", "partyType"],
       where,
       _count: { _all: true },
-      _sum: { expectedPax: true },
+      _sum: { expectedPax: true, actualPax: true },
     }),
     prisma.booking.aggregate({ where, _sum: { initialPax: true, expectedPax: true, actualPax: true } }),
   ]);
@@ -635,12 +664,16 @@ async function aggregateReport(where: Prisma.BookingWhereInput, startDate: strin
   const dinnerMap = new Map<number, number>();
   const lunchPaxMap = new Map<number, number>();
   const dinnerPaxMap = new Map<number, number>();
+  const lunchActualPaxMap = new Map<number, number>();
+  const dinnerActualPaxMap = new Map<number, number>();
   for (const g of typeByBranchGroups) {
     const isLunch = g.partyType === "LUNCH";
     const countTarget = isLunch ? lunchMap : dinnerMap;
     const paxTarget = isLunch ? lunchPaxMap : dinnerPaxMap;
+    const actualTarget = isLunch ? lunchActualPaxMap : dinnerActualPaxMap;
     countTarget.set(g.branchId, (countTarget.get(g.branchId) ?? 0) + (g._count._all ?? 0));
     paxTarget.set(g.branchId, (paxTarget.get(g.branchId) ?? 0) + (g._sum.expectedPax ?? 0));
+    actualTarget.set(g.branchId, (actualTarget.get(g.branchId) ?? 0) + (g._sum.actualPax ?? 0));
   }
 
   return {
@@ -671,6 +704,8 @@ async function aggregateReport(where: Prisma.BookingWhereInput, startDate: strin
       dinner: dinnerMap.get(g.branchId) ?? 0,
       lunchPax: lunchPaxMap.get(g.branchId) ?? 0,
       dinnerPax: dinnerPaxMap.get(g.branchId) ?? 0,
+      lunchActualPax: lunchActualPaxMap.get(g.branchId) ?? 0,
+      dinnerActualPax: dinnerActualPaxMap.get(g.branchId) ?? 0,
       initialPax: g._sum.initialPax ?? 0,
       expectedPax: g._sum.expectedPax ?? 0,
       actualPax: g._sum.actualPax ?? 0,
@@ -691,7 +726,7 @@ function reportWhere(user: AuthUser, q: BookingReportQueryInput, startDate: stri
 }
 
 export async function getBookingReport(query: BookingReportQueryInput, user: AuthUser): Promise<BookingReportResult> {
-  const today = getTodayString();
+  const today = getDhakaTodayString();
   const startDate = query.startDate ?? today;
   const endDate = query.endDate ?? startDate;
   const key = bookingsKey("report", query, user);
@@ -699,12 +734,12 @@ export async function getBookingReport(query: BookingReportQueryInput, user: Aut
 }
 
 export async function getDailyReport(date: string | undefined, user: AuthUser, branchId?: string): Promise<BookingReportResult> {
-  const day = date ?? getTodayString();
+  const day = date ?? getDhakaTodayString();
   return getBookingReport({ startDate: day, endDate: day, branchId }, user);
 }
 
 export async function getWeeklyReport(date: string | undefined, user: AuthUser, branchId?: string): Promise<BookingReportResult> {
-  const anchor = toDateOnly(date ?? getTodayString());
+  const anchor = toDateOnly(date ?? getDhakaTodayString());
   // Week starts Monday (UTC)
   const dow = (anchor.getUTCDay() + 6) % 7;
   const monday = new Date(anchor.getTime() - dow * 86400000);
@@ -715,7 +750,7 @@ export async function getWeeklyReport(date: string | undefined, user: AuthUser, 
 }
 
 export async function getMonthlyReport(month: string | undefined, user: AuthUser, branchId?: string): Promise<BookingReportResult & { month: string }> {
-  const m = month ?? getTodayString().slice(0, 7);
+  const m = month ?? getDhakaTodayString().slice(0, 7);
   if (!/^\d{4}-\d{2}$/.test(m)) throw appError("Expected month as YYYY-MM", httpStatus.BAD_REQUEST);
   const startDate = `${m}-01`;
   const end = toNextMonthStart(m);
@@ -725,7 +760,7 @@ export async function getMonthlyReport(month: string | undefined, user: AuthUser
 }
 
 export async function exportBookingsExcel(query: BookingReportQueryInput, user: AuthUser) {
-  const today = getTodayString();
+  const today = getDhakaTodayString();
   const startDate = query.startDate ?? today;
   const endDate = query.endDate ?? query.startDate ?? today;
   const where = reportWhere(user, query, startDate, endDate);

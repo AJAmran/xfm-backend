@@ -274,10 +274,26 @@ _(Full list in `prisma/seed.ts`. Passwords can be pinned via `SEED_*_PASSWORD` e
 | `npm run ensure:executives` | ✅ Yes      | Upserts COO/MD accounts by email, touches nothing else |
 | `npm run seed:inventory`  | ✅ Yes        | Idempotent inventory catalog sync (creates missing, re-syncs order) |
 | `npm run passwords:rotate`| ✅ Yes        | Re-hashes known seed accounts, revokes their sessions |
+| `npm run reports:pdf` | ✅ Yes        | Dry-run: builds yesterday's matrix PDF to `tmp/` (no mail sent) |
 | `npm run db:status`       | ✅ Yes        | Shows applied vs pending migrations (read-only)      |
 | `npm run db:deploy`       | ✅ Yes        | Applies pending migrations (always run after pull)   |
 
 All scripts share `prisma/seed-utils.ts` (client setup, password resolution, known-account registry).
+
+### Scheduled Report Mails (cron)
+
+Asia/Dhaka wall-clock, started with the server (`src/lib/cron.ts`):
+
+| Schedule | Job | Mail |
+| -------- | --- | ---- |
+| Daily 00:01 | Yesterday's booking matrix PDF | 1 PDF to `REPORT_MAIL_TO` |
+| Monthly 1st 00:05 | Previous month split 1–7 / 8–14 / 15–21 / 22–end | 4 weekly PDFs in one mail |
+
+Mail stack follows b7-healthcare: Gmail SMTP singleton (`src/lib/mailer.ts`),
+EJS body (`src/templates/booking-report.template.ts`), `node-cron` schedules.
+Configure in `.env`: `SMTP_USER` + `SMTP_PASSWORD` (Gmail **App Password**),
+`EMAIL_SENDER`, `REPORT_MAIL_TO`. Leave `SMTP_USER` empty to disable
+(jobs log a warning and skip).
 
 ---
 

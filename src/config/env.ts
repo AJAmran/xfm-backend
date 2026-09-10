@@ -29,6 +29,14 @@ const envSchema = z.object({
   RATE_LIMIT_MAX: z.coerce.number().positive().default(2000),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().positive().default(15 * 60 * 1000),
   AUTH_RATE_LIMIT_MAX: z.coerce.number().positive().default(50),
+  // Outgoing mail (Gmail SMTP, same style as b7 healthcare backend).
+  // Leave SMTP_USER empty to disable scheduled report mails.
+  // Gmail accounts need an App Password (not the login password).
+  SMTP_USER: z.string().optional().default(""),
+  SMTP_PASSWORD: z.string().optional().default(""),
+  EMAIL_SENDER: z.string().optional().default("X-Group Reports <no-reply@x-grouprestaurant.com>"),
+  // Nightly + monthly booking report recipient.
+  REPORT_MAIL_TO: z.string().optional().default("amran.xgroup@gmail.com"),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -58,4 +66,8 @@ export default {
   rate_limit_window_ms: env.RATE_LIMIT_WINDOW_MS,
   auth_rate_limit_max: env.AUTH_RATE_LIMIT_MAX,
   redis_url: env.REDIS_URL,
+  smtp_user: env.SMTP_USER,
+  smtp_password: env.SMTP_PASSWORD,
+  email_sender: env.EMAIL_SENDER,
+  report_mail_to: env.REPORT_MAIL_TO,
 };

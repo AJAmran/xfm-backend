@@ -1,18 +1,4 @@
-/**
- * Test-data seeder for the booking system: tops up EVERY active branch to
- * ~12 bookings covering all statuses, both party types, past/today/future
- * dates, pax adjustments, actuals and a cancellation.
- *
- * SAFE — purely additive. Existing rows are never touched. Rows created
- * here carry a `[TEST-DATA]` remarks marker, so reruns only top up what
- * is missing (idempotent). Delete marker rows to start over:
- *   DELETE FROM booking_status_history WHERE booking_id IN
- *     (SELECT id FROM bookings WHERE remarks LIKE '[TEST-DATA]%');
- *   DELETE FROM booking_pax_adjustments WHERE booking_id IN (...same...);
- *   DELETE FROM bookings WHERE remarks LIKE '[TEST-DATA]%';
- *
- * Run: npx tsx prisma/seed-test-bookings.ts
- */
+
 import { randomBytes } from "node:crypto";
 import {
   BookingPartyType,

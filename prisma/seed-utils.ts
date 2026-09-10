@@ -1,14 +1,3 @@
-/**
- * Shared toolkit for every database seeding / ops script.
- *
- * Scripts and their safety contract:
- * - `seed.ts`                  DESTRUCTIVE — wipes all data, dev only
- *                              (refuses production without ALLOW_PRODUCTION_SEED=true)
- * - `seed-inventory-catalog.ts` SAFE — idempotent catalog sync, never deletes
- * - `ensure-executive-accounts.ts` SAFE — upserts COO/MD by email, touches nothing else
- * - `rotate-seed-passwords.ts` SAFE — re-hashes known seed accounts, revokes sessions
- * - `check-indexes.ts`         SAFE — read-only index audit
- */
 import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "node:crypto";
@@ -52,11 +41,6 @@ function generateStrongPassword(length = 24): string {
   return randomBytes(length).toString("base64url");
 }
 
-/**
- * Resolve an account password: explicit env var wins, then a pinned
- * fallback (provisioned credentials), otherwise a generated password
- * printed to stdout so it is never silently lost.
- */
 export function resolveSeedPassword(envKey: string, label: string, fallback?: string): string {
   const fromEnv = process.env[envKey];
   if (fromEnv) return fromEnv;
