@@ -353,17 +353,16 @@ export function splitMonthWeeks(yearMonth: string): Array<{ start: string; end: 
   }));
 }
 
-/** Monthly job (1st, 00:05 Dhaka): previous month as 4 weekly PDFs in one mail. */
+/** Monthly job: the CURRENT month (month-to-date) as 4 weekly PDFs in one mail.
+ *  Triggered on the month's last night (see cron.ts) so the month is complete. */
 export async function sendMonthlyBookingReports(): Promise<void> {
   if (!isMailConfigured() || !env.report_mail_to) {
     logger.warn("Cron(monthly-report): SMTP not configured — skipping.");
     return;
   }
   const scope = await systemScope();
-  const [y, m] = getDhakaTodayString().split("-").map(Number);
-  const prev = new Date(Date.UTC(y!, m! - 1, 1));
-  const prevYm = `${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, "0")}`;
-  const weeks = splitMonthWeeks(prevYm);
+  const currentYm = getDhakaTodayString().slice(0, 7);
+  const weeks = splitMonthWeeks(currentYm);
 
   const attachments: MailAttachment[] = [];
   let monthTotal = 0;
@@ -382,19 +381,19 @@ export async function sendMonthlyBookingReports(): Promise<void> {
       active,
       cells,
     );
-    attachments.push({ filename: `Booking_Report_${prevYm}_W${i + 1}.pdf`, content: pdf });
+    attachments.push({ filename: `Booking_Report_${currentYm}_W${i + 1}.pdf`, content: pdf });
   }
 
-  const monthReport = await getBookingReport({ startDate: `${prevYm}-01`, endDate: weeks[3]!.end }, scope);
+  const monthReport = await getBookingReport({ startDate: `${currentYm}-01`, endDate: weeks[3]!.end }, scope);
   await sendMail(
     env.report_mail_to,
-    `Monthly Booking Reports — ${prevYm} (4 weeks, X-Group)`,
+    `Monthly Booking Reports — ${currentYm} (4 weeks, X-Group)`,
     toMailData(
-      `Monthly Booking Reports — ${prevYm}`,
-      `${prevYm} · 4 weekly PDFs attached · ${monthTotal} bookings, ${monthPax} expected guests`,
+      `Monthly Booking Reports — ${currentYm}`,
+      `${currentYm} · 4 weekly PDFs attached · ${monthTotal} bookings, ${monthPax} expected guests`,
       monthReport,
     ),
     attachments,
   );
-  logger.info({ month: prevYm }, "Cron(monthly-report): mailed 4 weekly PDFs.");
+  logger.info({ month: currentYm }, "Cron(monthly-report): mailed 4 weekly PDFs.");
 }

@@ -286,8 +286,8 @@ Asia/Dhaka wall-clock, started with the server (`src/lib/cron.ts`):
 
 | Schedule | Job | Mail |
 | -------- | --- | ---- |
-| Daily 00:01 | Yesterday's booking matrix PDF | 1 PDF to `REPORT_MAIL_TO` |
-| Monthly 1st 00:05 | Previous month split 1–7 / 8–14 / 15–21 / 22–end | 4 weekly PDFs in one mail |
+| Daily 00:01 | Today's booking matrix PDF | 1 PDF to `REPORT_MAIL_TO` |
+| Monthly last day 23:55 | Current month split 1–7 / 8–14 / 15–21 / 22–end | 4 weekly PDFs in one mail |
 
 Mail stack follows b7-healthcare: Gmail SMTP singleton (`src/lib/mailer.ts`),
 EJS body (`src/templates/booking-report.template.ts`), `node-cron` schedules.
