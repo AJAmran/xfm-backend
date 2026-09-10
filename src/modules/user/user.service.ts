@@ -17,7 +17,7 @@ interface AuthUser {
 }
 
 /** Strips the password field from a user record before returning to the client. */
-function omitPassword<T extends { password: string }>(user: T): Omit<T, "password"> {
+function omitPassword<T extends { password?: string }>(user: T): Omit<T, "password"> {
   const { password: _, ...rest } = user;
   return rest;
 }
@@ -50,7 +50,9 @@ export async function getPaginatedUsers(query: UserQueryInput) {
   if (query.isActive !== undefined) filters.isActive = query.isActive;
 
   const { data, total } = await userRepo.findAllUsers(filters, pagination);
-  return { data: data.map(omitPassword), meta: buildMetadata(total, pagination) };
+  // Repository already omits `password` at the DB layer; strip defensively so
+  // the API shape is unchanged even if the projection changes.
+  return { data: data.map((u) => omitPassword(u as unknown as Record<string, unknown> & { password?: string })), meta: buildMetadata(total, pagination) };
 }
 
 export async function updateUser(id: number, payload: UpdateUserInput, caller: AuthUser) {

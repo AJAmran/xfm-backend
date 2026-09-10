@@ -229,12 +229,21 @@ export async function getReportSummary(user: AuthUser) {
       baseWhere.branchId = user.branchId ?? undefined;
     }
 
-    const [total, pending, approved, rejected] = await Promise.all([
-      prisma.managerReport.count({ where: baseWhere }),
-      prisma.managerReport.count({ where: { ...baseWhere, approvalStatus: "PENDING" } }),
-      prisma.managerReport.count({ where: { ...baseWhere, approvalStatus: "APPROVED" } }),
-      prisma.managerReport.count({ where: { ...baseWhere, approvalStatus: "REJECTED" } }),
-    ]);
+    const groups = await prisma.managerReport.groupBy({
+      by: ["approvalStatus"],
+      where: baseWhere,
+      _count: { _all: true },
+    });
+
+    let pending = 0;
+    let approved = 0;
+    let rejected = 0;
+    for (const g of groups) {
+      if (g.approvalStatus === "PENDING") pending = g._count._all;
+      else if (g.approvalStatus === "APPROVED") approved = g._count._all;
+      else if (g.approvalStatus === "REJECTED") rejected = g._count._all;
+    }
+    const total = pending + approved + rejected;
 
     return { total, pending, approved, rejected };
   }, REPORTS_LIST_TTL);
@@ -328,16 +337,20 @@ export async function deleteReport(id: number, user: AuthUser) {
 }
 
 export async function setReportApproval(id: number, payload: ApprovalStatusInput, user: AuthUser) {
-  const existing = await prisma.managerReport.findUnique({
-    where: { id },
-    select: { approvalStatus: true, isDeleted: true, branchId: true },
-  });
+  // Guard + approver signature are independent reads (approver depends only on
+  // the caller, not the report), so they share one RTT; validation still runs
+  // before any write.
+  const [existing, approver] = await Promise.all([
+    prisma.managerReport.findUnique({
+      where: { id },
+      select: { approvalStatus: true, isDeleted: true, branchId: true },
+    }),
+    // Stamp the approver's signature image on approval (e.g. COO sign).
+    // Snapshotted onto the record so it survives later profile changes.
+    prisma.user.findUnique({ where: { id: user.id }, select: { signatureUrl: true } }),
+  ]);
   if (!existing || existing.isDeleted) throw appError("Manager report not found", httpStatus.NOT_FOUND);
   if (existing.approvalStatus === "APPROVED") throw appError("This report is already approved", httpStatus.CONFLICT);
-
-  // Stamp the approver's signature image on approval (e.g. COO sign).
-  // Snapshotted onto the record so it survives later profile changes.
-  const approver = await prisma.user.findUnique({ where: { id: user.id }, select: { signatureUrl: true } });
 
   const report = await prisma.managerReport.update({
     where: { id },

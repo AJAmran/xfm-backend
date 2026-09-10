@@ -29,6 +29,9 @@ model ManagerReport {
   @@index([reportDate])
   @@index([isDeleted])
   @@index([approvalStatus])
+  @@index([branchId, approvalStatus])
+  @@index([branchId, reportDate])
+  @@index([branchId, approvalStatus, reportDate])
   @@map("manager_reports")
 }
 
@@ -76,6 +79,7 @@ model ManagerReportComment {
   user   User           @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([reportId])
+  @@index([reportId, createdAt])
   @@index([userId])
   @@map("manager_report_comments")
 }

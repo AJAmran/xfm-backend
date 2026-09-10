@@ -32,7 +32,10 @@ export async function findAllUsers(
   }
 
   const [data, total] = await prisma.$transaction([
-    prisma.user.findMany({ where, ...pagination }),
+    // Omit the bcrypt hash at the DB layer: the list path transfers N rows per
+    // page, so this cuts payload + memory without changing the API shape
+    // (service still maps through omitPassword for safety).
+    prisma.user.findMany({ where, ...pagination, omit: { password: true } }),
     prisma.user.count({ where }),
   ]);
 
