@@ -2,7 +2,6 @@ import app from "./app";
 import env from "./config/env";
 import { prisma } from "./lib/prisma";
 import { logger } from "./lib/logger";
-import { startCronJobs } from "./lib/cron";
 import {
   getDashboardSummary,
   getRatingAnalytics,
@@ -42,9 +41,6 @@ async function main() {
 
     // Start warming the shared caches immediately — it must never block boot.
     prewarmCaches();
-
-    // Nightly/monthly booking report mails (no-op without SMTP creds).
-    startCronJobs();
 
     const shutdown = async (signal: string) => {
       logger.info({ signal }, "shutting down gracefully");
