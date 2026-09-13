@@ -23,5 +23,6 @@ model Branch {
 
   @@index([code, isActive])
   @@index([isDeleted])
+  @@index([isDeleted, isActive])
   @@map("branches")
 }

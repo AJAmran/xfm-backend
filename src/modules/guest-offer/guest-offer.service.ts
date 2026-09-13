@@ -164,11 +164,14 @@ export async function updateDiscountLog(id: number, payload: GuestDiscountUpdate
 }
 
 export async function setDiscountLogApproval(id: number, payload: ApprovalStatusInput, user: AuthUser) {
-  const existing = await prisma.guestDiscountLog.findUnique({ where: { id }, select: { approvalStatus: true, isDeleted: true, branchId: true } });
+  // Independent reads share one RTT; the not-found/already-approved guards
+  // still run before the write below.
+  const [existing, approver] = await Promise.all([
+    prisma.guestDiscountLog.findUnique({ where: { id }, select: { approvalStatus: true, isDeleted: true, branchId: true } }),
+    prisma.user.findUnique({ where: { id: user.id }, select: { signatureUrl: true } }),
+  ]);
   if (!existing || existing.isDeleted) throw appError("Discount log not found", httpStatus.NOT_FOUND);
   if (existing.approvalStatus === "APPROVED") throw appError("This log is already approved", httpStatus.CONFLICT);
-
-  const approver = await prisma.user.findUnique({ where: { id: user.id }, select: { signatureUrl: true } });
 
   const log = await prisma.guestDiscountLog.update({
     where: { id },

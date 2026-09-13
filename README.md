@@ -280,20 +280,21 @@ _(Full list in `prisma/seed.ts`. Passwords can be pinned via `SEED_*_PASSWORD` e
 
 All scripts share `prisma/seed-utils.ts` (client setup, password resolution, known-account registry).
 
-### Scheduled Report Mails (cron)
+### Report Mails (scheduled cron removed)
 
-Asia/Dhaka wall-clock, started with the server (`src/lib/cron.ts`):
+Scheduled booking report mails are **disabled** — the `node-cron` scheduler
+(`src/lib/cron.ts`) was removed. No automatic mails are sent.
 
-| Schedule | Job | Mail |
-| -------- | --- | ---- |
-| Daily 00:01 | Today's booking matrix PDF | 1 PDF to `REPORT_MAIL_TO` |
-| Monthly last day 23:55 | Current month split 1–7 / 8–14 / 15–21 / 22–end | 4 weekly PDFs in one mail |
+Manual options still available:
 
-Mail stack follows b7-healthcare: Gmail SMTP singleton (`src/lib/mailer.ts`),
-EJS body (`src/templates/booking-report.template.ts`), `node-cron` schedules.
-Configure in `.env`: `SMTP_USER` + `SMTP_PASSWORD` (Gmail **App Password**),
-`EMAIL_SENDER`, `REPORT_MAIL_TO`. Leave `SMTP_USER` empty to disable
-(jobs log a warning and skip).
+| Command | Job |
+| ------- | --- |
+| `npm run reports:pdf` | Dry-run: builds yesterday's matrix PDF to `tmp/` (no mail sent) |
+
+Mail stack (kept for manual use): Gmail SMTP singleton (`src/lib/mailer.ts`),
+EJS body (`src/templates/booking-report.template.ts`), builders in
+`src/lib/report-mailer.ts`. Configure in `.env`: `SMTP_USER` + `SMTP_PASSWORD`
+(Gmail **App Password**), `EMAIL_SENDER`, `REPORT_MAIL_TO`.
 
 ---
 

@@ -23,5 +23,6 @@ model Notification {
   @@index([read])
   @@index([branchId, createdAt])
   @@index([createdAt])
+  @@index([branchId, read, createdAt])
   @@map("notifications")
 }

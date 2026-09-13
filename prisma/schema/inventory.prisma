@@ -49,6 +49,8 @@ model MonthlyInventoryStatement {
 
   @@unique([branchId, statementMonth])
   @@index([isDeleted])
+  @@index([branchId, status])
+  @@index([statementMonth, branchId])
   @@map("monthly_inventory_statements")
 }
 

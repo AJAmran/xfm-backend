@@ -304,19 +304,23 @@ export async function addPaxAdjustment(id: number, payload: PaxAdjustInput, user
 }
 
 export async function getPaxHistory(id: number, user: AuthUser) {
-  const booking = await prisma.booking.findUnique({
-    where: { id },
-    select: { branchId: true, isDeleted: true, initialPax: true, expectedPax: true, actualPax: true },
-  });
+  // Booking guard + adjustments are independent reads; auth is checked in JS
+  // after both resolve so the two queries share a single RTT.
+  const [booking, adjustments] = await Promise.all([
+    prisma.booking.findUnique({
+      where: { id },
+      select: { branchId: true, isDeleted: true, initialPax: true, expectedPax: true, actualPax: true },
+    }),
+    prisma.bookingPaxAdjustment.findMany({
+      where: { bookingId: id },
+      orderBy: { createdAt: "asc" },
+      include: { createdBy: { select: { id: true, name: true } } },
+    }),
+  ]);
   if (!booking || booking.isDeleted) throw appError("Booking not found", httpStatus.NOT_FOUND);
   if (isManager(user) && booking.branchId !== user.branchId) {
     throw appError("Forbidden: You do not have access to this booking", httpStatus.FORBIDDEN);
   }
-  const adjustments = await prisma.bookingPaxAdjustment.findMany({
-    where: { bookingId: id },
-    orderBy: { createdAt: "asc" },
-    include: { createdBy: { select: { id: true, name: true } } },
-  });
   const summary = computePaxSummary(
     booking.initialPax,
     adjustments.map((a) => ({ type: a.type, quantity: a.quantity })),
@@ -328,7 +332,11 @@ export async function getPaxHistory(id: number, user: AuthUser) {
 // ─── Actual pax + status ─────────────────────────────────────────────────────
 
 export async function setActualPax(id: number, payload: ActualPaxInput, user: AuthUser) {
-  const existing = await prisma.booking.findUnique({ where: { id } });
+  // Guard needs only scoping + state columns; avoids fetching large text blobs.
+  const existing = await prisma.booking.findUnique({
+    where: { id },
+    select: { branchId: true, isDeleted: true, status: true },
+  });
   if (!existing || existing.isDeleted) throw appError("Booking not found", httpStatus.NOT_FOUND);
   if (isManager(user) && existing.branchId !== user.branchId) {
     throw appError("Forbidden: own branch only", httpStatus.FORBIDDEN);
@@ -347,7 +355,12 @@ export async function setActualPax(id: number, payload: ActualPaxInput, user: Au
 }
 
 export async function setBookingStatus(id: number, payload: BookingStatusInput, user: AuthUser) {
-  const existing = await prisma.booking.findUnique({ where: { id } });
+  // Narrow guard projection: only the columns the transition rules read
+  // (scoping + status + completion prerequisites). No text blobs.
+  const existing = await prisma.booking.findUnique({
+    where: { id },
+    select: { branchId: true, isDeleted: true, status: true, actualPax: true, partyDate: true },
+  });
   if (!existing || existing.isDeleted) throw appError("Booking not found", httpStatus.NOT_FOUND);
   if (isManager(user) && existing.branchId !== user.branchId) {
     throw appError("Forbidden: own branch only", httpStatus.FORBIDDEN);
@@ -611,7 +624,9 @@ export interface BookingReportResult {
 }
 
 async function aggregateReport(where: Prisma.BookingWhereInput, startDate: string, endDate: string): Promise<BookingReportResult> {
-  const [statusGroups, typeGroups, branchGroups, typeByBranchGroups, pax] = await Promise.all([
+  // All six groupings are independent (confirmedGroups only narrows `where` by
+  // status) so they run in one parallel batch: 6 queries -> 1 RTT instead of 2.
+  const [statusGroups, typeGroups, branchGroups, typeByBranchGroups, pax, confirmedGroups] = await Promise.all([
     prisma.booking.groupBy({ by: ["status"], where, _count: { _all: true } }),
     prisma.booking.groupBy({
       by: ["partyType"],
@@ -634,6 +649,11 @@ async function aggregateReport(where: Prisma.BookingWhereInput, startDate: strin
       _sum: { expectedPax: true, actualPax: true },
     }),
     prisma.booking.aggregate({ where, _sum: { initialPax: true, expectedPax: true, actualPax: true } }),
+    prisma.booking.groupBy({
+      by: ["branchId"],
+      where: { ...where, status: "CONFIRMED" },
+      _count: { _all: true },
+    }),
   ]);
 
   const byStatus: Record<string, number> = { TENTATIVE: 0, CONFIRMED: 0, CANCELLED: 0, COMPLETED: 0 };
@@ -653,12 +673,7 @@ async function aggregateReport(where: Prisma.BookingWhereInput, startDate: strin
     : [];
   const branchMap = new Map(branches.map((b) => [b.id, b]));
 
-  // Per-branch confirmed + lunch/dinner counts (grouped queries, bounded by branch count)
-  const confirmedGroups = await prisma.booking.groupBy({
-    by: ["branchId"],
-    where: { ...where, status: "CONFIRMED" },
-    _count: { _all: true },
-  });
+  // Per-branch confirmed + lunch/dinner counts (from the parallel batch above)
   const confirmedMap = new Map(confirmedGroups.map((g) => [g.branchId, g._count._all]));
   const lunchMap = new Map<number, number>();
   const dinnerMap = new Map<number, number>();

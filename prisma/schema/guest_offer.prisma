@@ -28,6 +28,8 @@ model GuestDiscountLog {
   @@index([branchId, logDate])
   @@index([approvalStatus])
   @@index([isDeleted])
+  @@index([branchId, approvalStatus])
+  @@index([branchId, approvalStatus, logDate])
   @@map("guest_discount_logs")
 }
 
@@ -60,5 +62,7 @@ model GuestEntertainmentLog {
   @@index([branchId, logDate])
   @@index([approvalStatus])
   @@index([isDeleted])
+  @@index([branchId, approvalStatus])
+  @@index([branchId, approvalStatus, logDate])
   @@map("guest_entertainment_logs")
 }

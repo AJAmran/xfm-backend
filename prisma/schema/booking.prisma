@@ -37,6 +37,9 @@ model Booking {
   @@index([partyDate])
   @@index([status])
   @@index([isDeleted])
+  @@index([branchId, status, partyDate])
+  @@index([branchId, partyType, partyDate])
+  @@index([status, partyDate])
   @@map("bookings")
 }
 
@@ -55,6 +58,7 @@ model BookingPaxAdjustment {
   createdBy User    @relation("BookingAdjustmentCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([bookingId])
+  @@index([bookingId, createdAt])
   @@map("booking_pax_adjustments")
 }
 
@@ -71,5 +75,6 @@ model BookingStatusHistory {
   changedBy User    @relation("BookingStatusChangedBy", fields: [changedByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([bookingId])
+  @@index([bookingId, createdAt])
   @@map("booking_status_history")
 }
