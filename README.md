@@ -231,7 +231,7 @@ Setting (standalone key-value table)
 | ------------ | --------------------------------------------------------------- |
 | `Role`       | `SUPER_ADMIN`, `ADMIN`, `BRANCH_MANAGER`, `COO`, `MD`            |
 | `HeardAbout` | `SOCIAL_MEDIA`, `FRIENDS_AND_FAMILY`, `VISITED_BEFORE`          |
-| `AgeGroup`   | `BELOW_18`, `AGE_18_30`, `AGE_31_50`, `AGE_51_PLUS`              |
+| `AgeGroup`   | `BELOW_18`, `AGE_18_30`, `AGE_31_45`, `AGE_45_PLUS`              |
 
 ### Indexes
 
