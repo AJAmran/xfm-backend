@@ -3,6 +3,7 @@ import { Prisma, Role } from "../../../generated/prisma/client";
 import { prisma } from "../../lib/prisma";
 import { appError } from "../../utils/appError";
 import { CreateFeedbackInput, FeedbackQueryInput } from "./feedback.validation";
+import { calculateOverallRating } from "./feedback.rating";
 import { transformPagination, buildMetadata } from "../../utils/queryBuilder";
 import { publishDataChanged } from "../../lib/realtime";
 import { withCache } from "../../lib/cache";
@@ -22,9 +23,19 @@ export async function submitFeedback(payload: CreateFeedbackInput) {
   if (!branch) throw appError("Branch not found or inactive", httpStatus.NOT_FOUND);
 
   try {
+    // Overall is derived from the rated categories (empty ones excluded).
+    // An explicitly supplied overallRating is only a fallback for API
+    // clients that rate nothing at all.
+    const derivedOverall = calculateOverallRating({
+      foodRating: payload.foodRating,
+      serviceRating: payload.serviceRating,
+      environmentRating: payload.environmentRating,
+      eventRating: payload.eventRating,
+    });
     const feedback = await prisma.guestFeedback.create({
       data: {
         ...payload,
+        overallRating: derivedOverall ?? payload.overallRating ?? null,
         contact: payload.contact ?? "",
       },
     });

@@ -563,7 +563,7 @@ Optimized for speed — relies on DB-level foreign key constraints rather than p
 | `eventRating` | number (int, 1–5) | No | Event rating |
 | `overallRating` | number (int, 1–5) | No | Overall rating |
 | `heardAbout` | enum | No | `SOCIAL_MEDIA`, `FRIENDS_AND_FAMILY`, `VISITED_BEFORE` |
-| `ageGroup` | enum | No | `BELOW_18`, `AGE_18_30`, `AGE_31_50`, `AGE_51_PLUS` |
+| `ageGroup` | enum | No | `BELOW_18`, `AGE_18_30`, `AGE_31_45`, `AGE_45_PLUS` |
 | `opinion` | string | No | Additional comments |
 
 **Response (201)**

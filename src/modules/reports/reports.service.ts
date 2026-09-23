@@ -6,6 +6,14 @@ import { appError } from "../../utils/appError";
 import env from "../../config/env";
 import { formatDateOnly, toDateOnly, toEndOfDay, toMonthStart, toNextMonthStart } from "../../utils/dateHelpers";
 
+/** Human-readable labels for the AgeGroup enum (used in Excel exports). */
+export const AGE_GROUP_LABELS: Record<string, string> = {
+  BELOW_18: "Below 18",
+  AGE_18_30: "18-30",
+  AGE_31_45: "31-45",
+  AGE_45_PLUS: "45+",
+};
+
 async function getFeedbacksInRange(start: Date, end: Date, branchId?: number) {
   const where: Prisma.GuestFeedbackWhereInput = { submittedAt: { gte: start, lte: end } };
   if (branchId) where.branchId = branchId;
@@ -144,7 +152,7 @@ export async function exportExcel(branchId?: number, startDate?: string, endDate
       eventRating: f.eventRating,
       overallRating: f.overallRating,
       heardAbout: f.heardAbout,
-      ageGroup: f.ageGroup,
+      ageGroup: f.ageGroup ? (AGE_GROUP_LABELS[f.ageGroup] ?? f.ageGroup) : f.ageGroup,
       opinion: f.opinion,
       submittedAt: f.submittedAt.toISOString(),
     });

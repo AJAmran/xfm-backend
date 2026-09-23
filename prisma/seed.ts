@@ -238,7 +238,7 @@ const FEEDBACK_TEMPLATES = [
     eventRating: 4,
     overallRating: 5,
     heardAbout: HeardAbout.FRIENDS_AND_FAMILY,
-    ageGroup: AgeGroup.AGE_31_50,
+    ageGroup: AgeGroup.AGE_31_45,
     opinion: "Excellent food and great ambiance. Will definitely come back!",
   },
   {
@@ -262,7 +262,7 @@ const FEEDBACK_TEMPLATES = [
     eventRating: 4,
     overallRating: 3,
     heardAbout: HeardAbout.VISITED_BEFORE,
-    ageGroup: AgeGroup.AGE_31_50,
+    ageGroup: AgeGroup.AGE_31_45,
     opinion: "Average experience, nothing special.",
   },
   {
@@ -286,7 +286,7 @@ const FEEDBACK_TEMPLATES = [
     eventRating: 3,
     overallRating: 3,
     heardAbout: HeardAbout.SOCIAL_MEDIA,
-    ageGroup: AgeGroup.AGE_51_PLUS,
+    ageGroup: AgeGroup.AGE_45_PLUS,
     opinion: "Disappointing compared to my last visit.",
   },
   {
@@ -298,7 +298,7 @@ const FEEDBACK_TEMPLATES = [
     eventRating: 5,
     overallRating: 4,
     heardAbout: HeardAbout.VISITED_BEFORE,
-    ageGroup: AgeGroup.AGE_31_50,
+    ageGroup: AgeGroup.AGE_31_45,
     opinion: "Great place for family gatherings.",
   },
   {
@@ -322,7 +322,7 @@ const FEEDBACK_TEMPLATES = [
     eventRating: 3,
     overallRating: 3,
     heardAbout: HeardAbout.SOCIAL_MEDIA,
-    ageGroup: AgeGroup.AGE_31_50,
+    ageGroup: AgeGroup.AGE_31_45,
     opinion: "Okay for the price point.",
   },
   {
@@ -346,7 +346,7 @@ const FEEDBACK_TEMPLATES = [
     eventRating: 4,
     overallRating: 4,
     heardAbout: HeardAbout.FRIENDS_AND_FAMILY,
-    ageGroup: AgeGroup.AGE_31_50,
+    ageGroup: AgeGroup.AGE_31_45,
     opinion: "Consistent quality every time I visit.",
   },
   {
@@ -370,7 +370,7 @@ const FEEDBACK_TEMPLATES = [
     eventRating: 4,
     overallRating: 5,
     heardAbout: HeardAbout.VISITED_BEFORE,
-    ageGroup: AgeGroup.AGE_51_PLUS,
+    ageGroup: AgeGroup.AGE_45_PLUS,
     opinion: "Staff is always welcoming and professional.",
   },
   {
@@ -382,7 +382,7 @@ const FEEDBACK_TEMPLATES = [
     eventRating: 3,
     overallRating: 2,
     heardAbout: HeardAbout.SOCIAL_MEDIA,
-    ageGroup: AgeGroup.AGE_31_50,
+    ageGroup: AgeGroup.AGE_31_45,
     opinion: "Very disappointed with the food quality today.",
   },
   {
@@ -394,7 +394,7 @@ const FEEDBACK_TEMPLATES = [
     eventRating: 2,
     overallRating: 2,
     heardAbout: HeardAbout.FRIENDS_AND_FAMILY,
-    ageGroup: AgeGroup.AGE_51_PLUS,
+    ageGroup: AgeGroup.AGE_45_PLUS,
     opinion: "Worst experience ever. Will not recommend to anyone.",
   },
 ];
