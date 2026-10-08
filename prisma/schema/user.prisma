@@ -5,6 +5,14 @@ model User {
   email     String   @unique
   password  String
   role      Role
+  // Org placement. Both are free text (not enums) so departments and titles can
+  // evolve without a migration; `role` remains the authorisation primitive.
+  department String? @map("department")
+  designation String? @map("designation")
+  // Display URL of the user's signature image. Powers the legacy single-stamp
+  // approvals; the document module additionally uses `signature_asset_id` +
+  // `signature_provider` to read the bytes. There is deliberately ONE display
+  // URL column — never a second `signature_image_url`.
   signatureUrl String? @map("signature_url")
   isActive  Boolean  @default(true) @map("is_active")
   isDeleted Boolean  @default(false) @map("is_deleted")
@@ -25,12 +33,21 @@ model User {
   approvedEntertainmentLogs       GuestEntertainmentLog[] @relation("ApprovedEntertainmentLogs")
   submittedInventoryStatements    MonthlyInventoryStatement[] @relation("SubmittedInventoryStatements")
   notifications                   Notification[]             @relation("ActorNotifications")
+  receivedNotifications           Notification[]             @relation("RecipientNotifications")
   createdBookings                 Booking[]                  @relation("BookingCreatedBy")
   confirmedBookings               Booking[]                  @relation("BookingConfirmedBy")
   cancelledBookings               Booking[]                  @relation("BookingCancelledBy")
   completedBookings               Booking[]                  @relation("BookingCompletedBy")
   bookingAdjustments              BookingPaxAdjustment[]     @relation("BookingAdjustmentCreatedBy")
   bookingStatusChanges            BookingStatusHistory[]     @relation("BookingStatusChangedBy")
+  signatureAssetId                String?  @map("signature_asset_id")
+  signatureProvider               String?  @map("signature_provider")
+  documentsCreated                Document[]                  @relation("DocumentCreatedBy")
+  documentVersionsCreated         DocumentVersion[]           @relation("DocumentVersionCreatedBy")
+  workflowSteps                   WorkflowStep[]              @relation("WorkflowStepApprover")
+  approvals                       Approval[]                  @relation("ApprovalApprover")
+  signaturePlacements             SignaturePlacement[]        @relation("SignatureSigner")
+  documentAuditLogs               DocumentAuditLog[]          @relation("DocumentAuditActor")
 
   @@index([email, role])
   @@index([branchId])

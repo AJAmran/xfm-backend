@@ -1,7 +1,9 @@
 model SystemSetting {
   id        Int      @id @default(autoincrement())
   key       String   @unique
-  value     String
+  // TEXT rather than the default VARCHAR(191): structured settings such as the
+  // document approval policy are JSON documents and outgrow a short string.
+  value     String   @db.Text
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("system_settings")

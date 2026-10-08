@@ -14,6 +14,7 @@ A production-grade REST API for collecting, managing, and analysing guest feedba
 - [Environment Variables](#environment-variables)
 - [Database](#database)
 - [API Reference](#api-reference)
+- [Document Approval & E-Signature](#document-approval--e-signature)
 - [Authentication](#authentication)
 - [Role Permissions Matrix](#role-permissions-matrix)
 - [Error Handling](#error-handling)
@@ -474,6 +475,123 @@ All endpoints return JSON in this shape:
 
 ---
 
+### Document Approval & E-Signature (`/api/v1/documents`, `/api/v1/approvals`)
+
+A dynamic multi-level approval workflow. The creator picks **who** signs and in
+**what order**; the backend routes the document, records every decision and
+generates the final signed PDF.
+
+**Design principles enforced server-side**
+
+- The user defines the workflow; the system enforces company policy and never
+  silently reorders a sequence — violations are reported with the exact position.
+- Every document **version** gets its own approval cycle. Previous approvals are
+  never reused, and a version cannot be submitted twice.
+- A workflow step can be decided **exactly once**: `approvals.workflow_step_id`
+  is `UNIQUE` and each step is claimed with a conditional update.
+- Signatures are snapshotted with the exact image and SHA-256 used, so a later
+  profile change never rewrites a historical approval.
+
+**Approval hierarchy** is derived from the existing `Role` enum — no second org
+model to maintain:
+
+| Rank | Role           |
+| ---- | -------------- |
+| 10   | `BRANCH_MANAGER` |
+| 20   | `ADMIN`          |
+| 30   | `COO`            |
+| 40   | `MD`             |
+| 50   | `SUPER_ADMIN`    |
+
+With the default `JUNIOR_TO_SENIOR` policy a sequence must be non-decreasing in
+rank. Equal ranks are allowed (with a warning). Set `hierarchyPolicy: "NONE"` to
+disable.
+
+#### Documents
+
+| Method | Endpoint                     | Auth              | Description                                    |
+| ------ | ---------------------------- | ----------------- | ---------------------------------------------- |
+| `POST` | `/documents`                 | write roles       | Create (multipart). `submit=true` also routes  |
+| `GET`  | `/documents`                 | all internal      | List; supports `view` buckets + filters        |
+| `GET`  | `/documents/summary`         | all internal      | Dashboard counters                             |
+| `GET`  | `/documents/types`           | all internal      | Active document types                          |
+| `POST` | `/documents/types`           | SUPER_ADMIN       | Create a document type                         |
+| `PATCH`| `/documents/types/:id`       | SUPER_ADMIN       | Update a document type                         |
+| `DELETE`| `/documents/types/:id`      | SUPER_ADMIN       | Delete (fails if still in use)                 |
+| `GET`  | `/documents/policy`          | all internal      | Approval policy                                |
+| `PATCH`| `/documents/policy`          | SUPER_ADMIN       | Update approval policy                         |
+| `GET`  | `/documents/audit-feed`      | SUPER_ADMIN       | Platform-wide audit log                        |
+| `GET`  | `/documents/audit-actions`   | SUPER_ADMIN       | Distinct audit action labels                   |
+| `GET`  | `/documents/storage-info`    | all internal      | Active storage provider                        |
+| `POST` | `/documents/sla-sweep`       | SUPER_ADMIN       | Send reminders / escalate overdue steps        |
+| `GET`  | `/documents/:id`             | authorised        | Detail incl. versions, workflow, capabilities  |
+| `PATCH`| `/documents/:id/submit`      | creator           | Start the approval cycle                       |
+| `POST` | `/documents/:id/approve`     | active approver   | Approve & sign at a normalised placement       |
+| `POST` | `/documents/:id/reject`      | active approver   | Reject — reason required, ends the cycle       |
+| `POST` | `/documents/:id/request-changes` | active approver | Return to the creator — reason required      |
+| `POST` | `/documents/:id/revisions`   | creator           | Upload a new version (multipart)               |
+| `POST` | `/documents/:id/cancel`      | creator / admin   | Cancel — reason required                       |
+| `POST` | `/documents/:id/archive`     | creator / SUPER_ADMIN | Archive an approved document               |
+| `DELETE`| `/documents/:id`            | creator / SUPER_ADMIN | Soft delete                                |
+| `GET`  | `/documents/:id/versions`    | authorised        | Version history                                |
+| `GET`  | `/documents/:id/workflow`    | authorised        | Workflow for all versions                      |
+| `GET`  | `/documents/:id/audit`       | authorised        | Audit trail for this document                  |
+| `GET`  | `/documents/files/:fileId`   | authorised        | Stream a file / redirect to a signed URL       |
+
+`view` buckets: `ALL` · `MINE` · `PENDING_APPROVAL` · `RETURNED` · `REJECTED` ·
+`APPROVED` · `ARCHIVED`.
+
+#### Approvals
+
+| Method | Endpoint                       | Auth            | Description                       |
+| ------ | ------------------------------ | --------------- | --------------------------------- |
+| `GET`  | `/approvals/pending`           | all internal    | Waiting on the signed-in user     |
+| `GET`  | `/approvals/history`           | all internal    | Decisions the user has made       |
+| `POST` | `/approvals/validate-sequence` | all internal    | Check a sequence against policy   |
+
+#### Signature (self-service)
+
+There is deliberately **no** `/users/:id/signature` route. A user may only ever
+manage their own signature, and the id always comes from the session.
+
+| Method | Endpoint                | Auth         | Description                                |
+| ------ | ----------------------- | ------------ | ------------------------------------------ |
+| `GET`  | `/documents/signature`  | all internal | Read own signature                         |
+| `POST` | `/documents/signature`  | all internal | Upload own signature (multipart, ≤ 2 MB)   |
+| `DELETE`| `/documents/signature` | all internal | Detach signature (blocked mid-approval)    |
+
+#### Document statuses
+
+`DRAFT` · `SUBMITTED` · `PENDING_APPROVAL` · `IN_REVIEW` ·
+`RETURNED_FOR_REVISION` · `REJECTED` · `APPROVED` · `CANCELLED` · `EXPIRED` ·
+`ARCHIVED`
+
+#### Supported file types
+
+PDF · DOC · DOCX · XLS · XLSX · JPG · JPEG · PNG · WebP (max 25 MB)
+
+Extension **and** MIME type are both validated, in the multer filter and again in
+the controller. Storage ids are backend-generated; a user-supplied filename is
+never used as a path.
+
+#### Final PDF
+
+Server-side generation with `pdf-lib`:
+
+- A **PDF** source is copied verbatim — no re-encode, no conversion.
+- Any other format is rendered into a certified A4 container page.
+- Signature coordinates arrive as percentages of the page box, so the stamp lands
+  exactly where it did in the browser.
+- The completed document is **locked**; any further change must be a new version.
+
+#### Reminders & escalation
+
+Thresholds live in the policy (`reminderAfterHours`, `escalateAfterHours`) and
+the sweep is an explicit `POST /documents/sla-sweep`. Scheduling stays the
+caller's job (cron / queue worker) because the deployment topology is unknown.
+
+---
+
 ## Authentication
 
 The API supports two token transport methods:
@@ -589,7 +707,11 @@ The global error handler maps all errors to clean HTTP responses:
 | Dev server    | `npm run dev`                 | Start with hot-reload via `tsx watch`                    |
 | Build         | `npm run build`               | Compile TypeScript to `dist/`                            |
 | Start         | `npm run start`               | Run compiled production build                            |
-| Seed (dev)    | `npm run seed`                | ⚠️ Wipes + seeds database (dev only)                     |
+| Seed (dev)    | `npm run seed`                | ⚠️ Wipes + seeds database (dev only)                    |
+| Documents     | `npm run seed:documents`      | Non-destructive: types, policy, signatures, samples    |
+| Smoke test    | `npx tsx scripts/smoke-document-module.ts` | Live end-to-end workflow test (server must be running) |
+| Storage check | `npx tsx scripts/diagnose-storage.ts`     | Verify Cloudinary upload + signed download      |
+| Module report | `npx tsx scripts/document-module-report.ts` | Row counts + data-integrity report (read-only)  |
 | Executives    | `npm run ensure:executives`   | Upsert COO/MD accounts (prod-safe)                       |
 | Inventory     | `npm run seed:inventory`      | Idempotent catalog sync (prod-safe)                      |
 | Rotate pw     | `npm run passwords:rotate`    | Re-hash seed accounts, revoke sessions                   |

@@ -8,6 +8,7 @@ import { UserFilterCriteria } from "./user.types";
 import { transformPagination, buildMetadata } from "../../utils/queryBuilder";
 import env from "../../config/env";
 import { publishDataChanged } from "../../lib/realtime";
+import { canActOnRole } from "../../lib/role-hierarchy";
 import { invalidateUserSession } from "../../lib/cache";
 
 interface AuthUser {
@@ -25,6 +26,15 @@ function omitPassword<T extends { password?: string }>(user: T): Omit<T, "passwo
 export async function createUser(payload: CreateUserInput, caller: AuthUser) {
   if (payload.role === Role.SUPER_ADMIN && caller.role !== Role.SUPER_ADMIN) {
     throw appError("Only Super Admin accounts can create Super Admin users", httpStatus.FORBIDDEN);
+  }
+  // General form of the check above: a caller may never provision an account
+  // senior to their own rank. Without this an ADMIN could create a COO or MD —
+  // and because createUser sets the password, would hold its credentials too.
+  if (!canActOnRole(caller.role, payload.role)) {
+    throw appError(
+      `You cannot create a "${payload.role}" account because it outranks your own role`,
+      httpStatus.FORBIDDEN,
+    );
   }
 
   const existing = await userRepo.findUserByEmail(payload.email);
@@ -65,6 +75,22 @@ export async function updateUser(id: number, payload: UpdateUserInput, caller: A
   }
   if (payload.role === Role.SUPER_ADMIN && caller.role !== Role.SUPER_ADMIN) {
     throw appError("Only Super Admin accounts can grant the Super Admin role", httpStatus.FORBIDDEN);
+  }
+
+  // General form of both checks above, covering every other seniority:
+  //  - you may not edit an account that outranks you (no demoting your boss)
+  //  - you may not promote someone past your own rank (no minting a COO/MD)
+  if (!canActOnRole(caller.role, existing.role)) {
+    throw appError(
+      `You cannot modify a "${existing.role}" account because it outranks your own role`,
+      httpStatus.FORBIDDEN,
+    );
+  }
+  if (payload.role && !canActOnRole(caller.role, payload.role)) {
+    throw appError(
+      `You cannot grant the "${payload.role}" role because it outranks your own role`,
+      httpStatus.FORBIDDEN,
+    );
   }
 
   // Prevent a Super Admin from locking themselves out of the system.

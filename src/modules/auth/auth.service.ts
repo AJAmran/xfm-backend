@@ -149,7 +149,20 @@ export async function logoutUser(token: string) {
 export async function getCurrentUser(userId: number) {
   const user = await prisma.user.findUnique({
     where: { id: userId, isDeleted: false },
-    select: { id: true, name: true, email: true, role: true, branchId: true, isActive: true, createdAt: true },
+    // `department` / `designation` are surfaced so the dashboard can label the
+    // signed-in user without a second request.
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      department: true,
+      designation: true,
+      signatureUrl: true,
+      branchId: true,
+      isActive: true,
+      createdAt: true,
+    },
   });
   if (!user) throw appError("User not found", httpStatus.NOT_FOUND);
   return user;

@@ -29,3 +29,7 @@ coverage/
 
 # Local report PDF dry-runs (npm run reports:pdf)
 tmp/
+
+# Local file storage used by the Document Approval module when CLOUDINARY_*
+# credentials are not configured (var/storage/).
+var/

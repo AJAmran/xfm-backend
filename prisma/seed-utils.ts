@@ -62,14 +62,27 @@ export interface SeedAccount {
   /** Approval signature image stamped on records this user approves. */
   signatureUrl?: string;
   branchId?: number | null;
+  department?: string | null;
+  designation?: string | null;
 }
 
-/** Single source of truth for well-known accounts across seed/rotate/ensure scripts. */
+/**
+ * Single source of truth for well-known accounts across seed/rotate/ensure
+ * scripts.
+ *
+ * `admin@` is the ADMIN (system-administration) account. The corporate Director
+ * lives at `director@` — during the corporate import the Director temporarily
+ * sat on `admin@` because the `DIRECTOR` role predated its own address, which
+ * silently dropped the only operational ADMIN account from the system. The two
+ * are separate accounts again: administrative access and document-oversight are
+ * different responsibilities.
+ */
 export const KNOWN_ACCOUNTS: Omit<SeedAccount, "branchId">[] = [
-  { name: "Super Administrator", email: "superadmin@x-grouprestaurant.com", role: Role.SUPER_ADMIN, envKey: "SEED_SUPER_ADMIN_PASSWORD", label: "Super Admin" },
-  { name: "System Administrator", email: "admin@x-grouprestaurant.com", role: Role.ADMIN, envKey: "SEED_ADMIN_PASSWORD", label: "Admin" },
-  { name: "Chief Operating Officer", email: "coo@x-grouprestaurant.com", role: Role.COO, envKey: "SEED_CEO_PASSWORD", label: "COO", fallbackPassword: "Coo@2026", signatureUrl: process.env.SEED_COO_SIGNATURE ?? process.env.SEED_CEO_SIGNATURE ?? "https://res.cloudinary.com/dhukcjdmi/image/upload/v1788755595/coo_cbik4c.png" },
-  { name: "Managing Director", email: "md@x-grouprestaurant.com", role: Role.MD, envKey: "SEED_MD_PASSWORD", label: "MD", fallbackPassword: "Managingderector@2026" },
+  { name: "Super Administrator", email: "superadmin@x-grouprestaurant.com", role: Role.SUPER_ADMIN, envKey: "SEED_SUPER_ADMIN_PASSWORD", label: "Super Admin", department: "Management", designation: "System Administrator" },
+  { name: "System Administrator", email: "admin@x-grouprestaurant.com", role: Role.ADMIN, envKey: "SEED_ADMIN_PASSWORD", label: "Administrator", department: "Management", designation: "System Administrator" },
+  { name: "Abid Uddin Ahmed", email: "director@x-grouprestaurant.com", role: Role.DIRECTOR, envKey: "CORPORATE_PW_DIRECTOR", label: "Director", department: "Management", designation: "Director" },
+  { name: "Jashim Uddin Ahmed", email: "md@x-grouprestaurant.com", role: Role.MD, envKey: "SEED_MD_PASSWORD", label: "MD", fallbackPassword: "Managingderector@2026", department: "Management", designation: "MD" },
+  { name: "Mohammed Jahangir Alam", email: "coo@x-grouprestaurant.com", role: Role.COO, envKey: "SEED_CEO_PASSWORD", label: "COO", fallbackPassword: "Coo@2026", signatureUrl: process.env.SEED_COO_SIGNATURE ?? process.env.SEED_CEO_SIGNATURE ?? "https://res.cloudinary.com/dhukcjdmi/image/upload/v1788755595/coo_cbik4c.png", department: "Management", designation: "Chief Operating Officer" },
 ];
 
 export async function hashPassword(plain: string): Promise<string> {

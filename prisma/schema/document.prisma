@@ -1,0 +1,298 @@
+// ─── Document Approval & E-Signature module ───────────────────────────────────
+// Enterprise workflow: a Document owns Versions; each Version owns exactly one
+// WorkflowInstance (one approval cycle). A WorkflowInstance owns ordered
+// WorkflowSteps; a completed Step owns one Approval (the decision) and one
+// SignaturePlacement (the frozen signature + coordinates).
+//
+// Hierarchy is derived from the existing `Role` enum (see document.logic.ts
+// `ROLE_HIERARCHY_RANK`) so no duplicate org model is introduced.
+
+enum DocumentStatus {
+  DRAFT
+  SUBMITTED
+  PENDING_APPROVAL
+  IN_REVIEW
+  RETURNED_FOR_REVISION
+  REJECTED
+  APPROVED
+  CANCELLED
+  EXPIRED
+  ARCHIVED
+
+  @@map("document_status")
+}
+
+enum WorkflowStepStatus {
+  PENDING
+  ACTIVE
+  APPROVED
+  REJECTED
+  RETURNED_FOR_REVISION
+  SKIPPED
+
+  @@map("workflow_step_status")
+}
+
+enum ApprovalActionType {
+  APPROVE_AND_SIGN
+  REJECT
+  REQUEST_CHANGES
+
+  @@map("approval_action_type")
+}
+
+enum DocumentFileKind {
+  SOURCE
+  FINAL_SIGNED
+
+  @@map("document_file_kind")
+}
+
+enum StorageProvider {
+  CLOUDINARY
+  LOCAL_SECURE
+
+  @@map("storage_provider")
+}
+
+model DocumentType {
+  id              Int      @id @default(autoincrement())
+  name            String
+  code            String   @unique
+  description     String?  @db.Text
+  defaultSlaHours Int      @default(48) @map("default_sla_hours")
+  sortOrder       Int      @default(0) @map("sort_order")
+  isActive        Boolean  @default(true) @map("is_active")
+  isDeleted       Boolean  @default(false) @map("is_deleted")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  documents Document[]
+
+  @@index([isDeleted, isActive])
+  @@index([sortOrder])
+  @@map("document_types")
+}
+
+model Document {
+  id               Int            @id @default(autoincrement())
+  documentNumber   String         @unique @map("document_number")
+  title            String
+  description      String?        @db.Text
+  documentTypeId   Int            @map("document_type_id")
+  branchId         Int?           @map("branch_id")
+  createdByUserId  Int            @map("created_by_user_id")
+  status           DocumentStatus @default(DRAFT)
+  currentVersion   Int            @default(1) @map("current_version")
+  // Optional monetary context. Persisted now so amount-based routing rules can
+  // be enabled later without another migration; unused by the MVP policy set.
+  referenceAmount  Decimal?       @map("reference_amount") @db.Decimal(14, 2)
+  submittedAt      DateTime?      @map("submitted_at")
+  approvedAt       DateTime?      @map("approved_at")
+  archivedAt       DateTime?      @map("archived_at")
+  // Once locked, only new versions may be created — the approved output is final.
+  isLocked         Boolean        @default(false) @map("is_locked")
+  isDeleted        Boolean        @default(false) @map("is_deleted")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  documentType DocumentType @relation(fields: [documentTypeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  branch       Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  createdBy    User         @relation("DocumentCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  versions           DocumentVersion[]
+  files              DocumentFile[]
+  workflowInstances  WorkflowInstance[]
+  approvals          Approval[]
+  auditLogs          DocumentAuditLog[]
+  notifications      Notification[]     @relation("DocumentNotifications")
+
+  @@index([status])
+  @@index([isDeleted, status])
+  @@index([createdByUserId, status])
+  @@index([branchId, status])
+  @@index([documentTypeId, status])
+  @@index([createdAt])
+  @@map("documents")
+}
+
+model DocumentVersion {
+  id                Int      @id @default(autoincrement())
+  documentId        Int      @map("document_id")
+  versionNumber     Int      @map("version_number")
+  changeSummary     String?  @db.Text @map("change_summary")
+  notes             String?  @db.Text
+  pageCount         Int?     @map("page_count")
+  createdByUserId   Int      @map("created_by_user_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  document      Document           @relation(fields: [documentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdBy     User               @relation("DocumentVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  files         DocumentFile[]
+  workflow      WorkflowInstance?
+
+  @@unique([documentId, versionNumber])
+  @@index([documentId, versionNumber])
+  @@map("document_versions")
+}
+
+model DocumentFile {
+  id                 Int               @id @default(autoincrement())
+  documentId         Int               @map("document_id")
+  versionId          Int               @map("version_id")
+  kind               DocumentFileKind  @default(SOURCE)
+  originalFileName   String            @map("original_file_name")
+  mimeType           String            @map("mime_type")
+  fileSize           Int               @map("file_size")
+  storageProvider    StorageProvider   @default(LOCAL_SECURE) @map("storage_provider")
+  // Backend-generated asset id (Cloudinary public_id or local relative path).
+  storageId          String            @map("storage_id")
+  resourceType       String            @default("raw") @map("resource_type")
+  format             String?
+  checksum           String?
+  pageCount          Int?              @map("page_count")
+  createdAt          DateTime          @default(now()) @map("created_at")
+
+  document Document        @relation(fields: [documentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  version  DocumentVersion @relation(fields: [versionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([documentId, kind])
+  @@index([versionId])
+  @@unique([storageProvider, storageId, kind])
+  @@map("document_files")
+}
+
+model WorkflowInstance {
+  id                  Int            @id @default(autoincrement())
+  documentId          Int            @map("document_id")
+  versionId           Int            @map("version_id")
+  // Denormalised for cheap timeline queries; always equals the version number.
+  documentVersion     Int            @map("document_version")
+  status              DocumentStatus @default(PENDING_APPROVAL)
+  currentStepOrder    Int?           @map("current_step_order")
+  totalSteps          Int            @map("total_steps")
+  startedAt           DateTime       @default(now()) @map("started_at")
+  completedAt         DateTime?      @map("completed_at")
+  terminatedReason    String?        @db.Text @map("terminated_reason")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+
+  document Document         @relation(fields: [documentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  version  DocumentVersion  @relation(fields: [versionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  steps    WorkflowStep[]
+
+  @@unique([versionId])
+  @@index([documentId, status])
+  @@index([status, currentStepOrder])
+  @@map("workflow_instances")
+}
+
+model WorkflowStep {
+  id                    Int                @id @default(autoincrement())
+  workflowInstanceId    Int                @map("workflow_instance_id")
+  stepOrder             Int                @map("step_order")
+  approverUserId        Int                @map("approver_user_id")
+  // Frozen at routing time so a later role/branch change cannot rewrite history.
+  approverNameSnapshot  String             @map("approver_name_snapshot")
+  approverRoleSnapshot  String             @map("approver_role_snapshot")
+  status                WorkflowStepStatus @default(PENDING)
+  assignedAt            DateTime?          @map("assigned_at")
+  dueAt                 DateTime?          @map("due_at")
+  completedAt           DateTime?          @map("completed_at")
+  reason                String?            @db.Text
+  remindedAt            DateTime?          @map("reminded_at")
+  escalatedAt           DateTime?          @map("escalated_at")
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+
+  workflowInstance WorkflowInstance @relation(fields: [workflowInstanceId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  approver          User             @relation("WorkflowStepApprover", fields: [approverUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  approval          Approval?
+  signature         SignaturePlacement?
+
+  @@unique([workflowInstanceId, stepOrder])
+  @@index([approverUserId, status])
+  @@index([status, dueAt])
+  @@index([approverUserId, status, dueAt])
+  @@map("workflow_steps")
+}
+
+// One decision per step — the unique constraint is the DB-level guarantee that a
+// workflow step can never be approved, rejected, or returned twice.
+model Approval {
+  id              Int                @id @default(autoincrement())
+  workflowStepId  Int                @unique @map("workflow_step_id")
+  documentId      Int                @map("document_id")
+  approverUserId  Int                @map("approver_user_id")
+  action          ApprovalActionType
+  comments        String?            @db.Text
+  ipAddress       String?            @map("ip_address")
+  userAgent       String?            @map("user_agent")
+  createdAt       DateTime           @default(now()) @map("created_at")
+
+  workflowStep WorkflowStep       @relation(fields: [workflowStepId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  document     Document           @relation(fields: [documentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  approver     User               @relation("ApprovalApprover", fields: [approverUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  signature    SignaturePlacement?
+
+  @@index([documentId, createdAt])
+  @@index([approverUserId, action])
+  @@map("approvals")
+}
+
+// Immutable copy of the signature actually used, plus normalised coordinates
+// (percentages of page width/height) so zoom and screen size never break
+// placement. Never updated after creation.
+model SignaturePlacement {
+  id               Int      @id @default(autoincrement())
+  workflowStepId   Int      @unique @map("workflow_step_id")
+  approvalId       Int      @unique @map("approval_id")
+  signerUserId     Int      @map("signer_user_id")
+  signerName       String   @map("signer_name")
+  signerRoleSnapshot String @map("signer_role_snapshot")
+  // Frozen asset reference + integrity digest of the signature bytes used.
+  signatureStorageId String  @map("signature_storage_id")
+  // Provider is frozen with the snapshot so the bytes can always be read back
+  // through the store that holds them, even if the deployment switches provider.
+  signatureProvider String   @map("signature_provider")
+  signatureUrl     String   @map("signature_url")
+  signatureSha256  String   @map("signature_sha256")
+  pageNumber       Int      @map("page_number")
+  x                Float
+  y                Float
+  width            Float
+  height           Float
+  signedAt         DateTime @default(now()) @map("signed_at")
+  ipAddress        String?  @map("ip_address")
+
+  workflowStep WorkflowStep @relation(fields: [workflowStepId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  approval     Approval     @relation(fields: [approvalId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  signer       User         @relation("SignatureSigner", fields: [signerUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([signerUserId])
+  @@map("signature_placements")
+}
+
+// Append-only. There is deliberately no update or delete path for this table.
+model DocumentAuditLog {
+  id                  Int            @id @default(autoincrement())
+  documentId          Int            @map("document_id")
+  documentVersion     Int            @map("document_version")
+  workflowStepId      Int?           @map("workflow_step_id")
+  actorUserId         Int?           @map("actor_user_id")
+  action              String
+  previousStatus      DocumentStatus? @map("previous_status")
+  newStatus           DocumentStatus? @map("new_status")
+  reason              String?        @db.Text
+  metadata            Json?
+  ipAddress           String?        @map("ip_address")
+  createdAt           DateTime       @default(now()) @map("created_at")
+
+  document Document      @relation(fields: [documentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  actor     User?         @relation("DocumentAuditActor", fields: [actorUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([documentId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+  @@map("document_audit_logs")
+}

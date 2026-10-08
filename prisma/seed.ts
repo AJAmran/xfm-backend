@@ -4,8 +4,10 @@ import {
   AgeGroup,
   ApprovalStatus,
   InventoryStatementStatus,
+  NotificationType,
 } from "../generated/prisma/enums";
 import { INVENTORY_CATALOG } from "./inventory-catalog";
+import { DOCUMENT_TYPES, DEFAULT_DOCUMENT_POLICY_JSON } from "./document-catalog";
 import {
   createSeedClient,
   SALT_ROUNDS,
@@ -435,6 +437,17 @@ async function main() {
     prisma.monthlyInventoryStatement.deleteMany(),
     prisma.inventoryItem.deleteMany(),
     prisma.inventoryCategory.deleteMany(),
+    // Document module: children first (audit/signature/approval/step → instance →
+    // file → version → document), then the document types themselves.
+    prisma.documentAuditLog.deleteMany(),
+    prisma.signaturePlacement.deleteMany(),
+    prisma.approval.deleteMany(),
+    prisma.workflowStep.deleteMany(),
+    prisma.workflowInstance.deleteMany(),
+    prisma.documentFile.deleteMany(),
+    prisma.documentVersion.deleteMany(),
+    prisma.document.deleteMany(),
+    prisma.documentType.deleteMany(),
     prisma.user.deleteMany(),
     prisma.systemSetting.deleteMany(),
   ]);
@@ -474,6 +487,8 @@ async function main() {
       password: await hashPassword(resolveSeedPassword(a.envKey, a.label, a.fallbackPassword)),
       role: a.role,
       signatureUrl: a.signatureUrl ?? null,
+      department: a.department ?? null,
+      designation: a.designation ?? null,
     })),
   );
 
@@ -548,9 +563,23 @@ async function main() {
       { key: "contact_phone", value: "01329661662" },
       { key: "feedback_form_active", value: "true" },
       { key: "company_address", value: "212 New Elephant Road, Dhaka-1205" },
+      { key: "document_policy", value: DEFAULT_DOCUMENT_POLICY_JSON },
     ],
   });
   console.log("  ✓ Settings: defaults created");
+
+  // ─── Document module master data ────────────────────────────────────────────
+  await prisma.documentType.createMany({ data: DOCUMENT_TYPES });
+  const documentTypeIds = new Map(
+    (
+      await prisma.documentType.findMany({
+        where: { isDeleted: false },
+        select: { id: true, code: true },
+      })
+    ).map((t) => [t.code, t.id]),
+  );
+  console.log(`  ✓ Document Types: ${DOCUMENT_TYPES.length} created`);
+  DOCUMENT_TYPES.forEach((t) => console.log(`      ${t.code} — ${t.name}`));
 
   // ─── Inventory master data (seed categories & items from the paper form) ───
   for (const category of INVENTORY_CATALOG) {
@@ -761,6 +790,283 @@ async function main() {
     console.log(
       `  ✓ Inventory Statements: previous month filled + current month (${activeItems.length} lines each)`,
     );
+  }
+
+  // ─── Document approval module: sample workflows in every lifecycle stage ─────
+  const approverPool = await prisma.user.findMany({
+    where: { isDeleted: false, isActive: true },
+    select: { id: true, name: true, role: true },
+    orderBy: { id: "asc" },
+  });
+  const managerApprover =
+    approverPool.find((u) => u.role === Role.BRANCH_MANAGER && manager0 && u.id !== manager0) ??
+    approverPool.find((u) => u.role === Role.BRANCH_MANAGER);
+  const adminApprover = approverPool.find((u) => u.role === Role.ADMIN);
+  const cooApprover = approverPool.find((u) => u.role === Role.COO);
+  const mdApprover = approverPool.find((u) => u.role === Role.MD);
+
+  // A junior-to-senior chain, the shape the policy engine enforces.
+  type ChainApprover = { id: number; name: string; role: string };
+  const chain: ChainApprover[] = (
+    managerApprover ? [managerApprover] : []
+  )
+    .concat(adminApprover ? [adminApprover] : [])
+    .concat(cooApprover ? [cooApprover] : [])
+    .concat(mdApprover ? [mdApprover] : []);
+
+  const author = manager0 ? await prisma.user.findUnique({ where: { id: manager0 }, select: { id: true, name: true } }) : null;
+
+  if (author && chain.length >= 2 && documentTypeIds.size) {
+    const purchaseTypeId = documentTypeIds.get("PURCHASE_REQUEST")!;
+    const leaveTypeId = documentTypeIds.get("LEAVE_REQUEST")!;
+    const policyTypeId = documentTypeIds.get("POLICY_NOTICE")!;
+
+    // ── Helper: creates a document with version 1 and an optional workflow ──
+    async function seedDocument(input: {
+      title: string;
+      description: string;
+      documentTypeId: number;
+      status: "DRAFT" | "PENDING_APPROVAL" | "IN_REVIEW" | "RETURNED_FOR_REVISION";
+      /** Number of chain steps that have already approved. */
+      approvedSteps?: number;
+      chain: ChainApprover[];
+    }) {
+      const approved = input.approvedSteps ?? 0;
+      const now = Date.now();
+
+      const doc = await prisma.document.create({
+        data: {
+          documentNumber: `PENDING-${now}-${Math.floor(Math.random() * 1e6)}`,
+          title: input.title,
+          description: input.description,
+          documentTypeId: input.documentTypeId,
+          branchId: branch0.id,
+          createdByUserId: author!.id,
+          status: input.status,
+          currentVersion: 1,
+          submittedAt: input.status === "DRAFT" ? null : new Date(now - 36 * 3600_000),
+        },
+        select: { id: true },
+      });
+
+      const docNumber = `DOC-${new Date().getFullYear()}-${String(doc.id).padStart(5, "0")}`;
+      await prisma.document.update({ where: { id: doc.id }, data: { documentNumber: docNumber } });
+
+      const version = await prisma.documentVersion.create({
+        data: {
+          documentId: doc.id,
+          versionNumber: 1,
+          changeSummary: "Initial document",
+          pageCount: 3,
+          createdByUserId: author!.id,
+        },
+        select: { id: true },
+      });
+
+      await prisma.documentFile.create({
+        data: {
+          documentId: doc.id,
+          versionId: version.id,
+          kind: "SOURCE",
+          originalFileName: `${input.title.replace(/[^a-z0-9]+/gi, "_")}.pdf`,
+          mimeType: "application/pdf",
+          fileSize: 420_000 + doc.id * 1_000,
+          storageProvider: "LOCAL_SECURE",
+          storageId: `documents/${doc.id}/v1/seed-source.pdf`,
+          resourceType: "raw",
+          format: "pdf",
+          pageCount: 3,
+        },
+      });
+
+      await prisma.documentAuditLog.create({
+        data: {
+          documentId: doc.id,
+          documentVersion: 1,
+          actorUserId: author!.id,
+          action: "DOCUMENT_CREATED",
+          newStatus: "DRAFT",
+        },
+      });
+
+      if (input.status === "DRAFT") return { id: doc.id, documentNumber: docNumber };
+
+      // Build the workflow with `approved` steps already completed.
+      const steps = input.chain.map((approver, index) => {
+        const order = index + 1;
+        const isApproved = order <= approved;
+        const isActive = order === approved + 1;
+        return {
+          stepOrder: order,
+          approverUserId: approver.id,
+          approverNameSnapshot: approver.name,
+          approverRoleSnapshot: approver.role,
+          status: (isApproved ? "APPROVED" : isActive ? "ACTIVE" : "PENDING") as "APPROVED" | "ACTIVE" | "PENDING",
+          assignedAt: isApproved || isActive ? new Date(now - 24 * 3600_000) : null,
+          dueAt: isApproved || isActive ? new Date(now + 24 * 3600_000) : null,
+          completedAt: isApproved ? new Date(now - (24 - order) * 3600_000) : null,
+        };
+      });
+
+      const instance = await prisma.workflowInstance.create({
+        data: {
+          documentId: doc.id,
+          versionId: version.id,
+          documentVersion: 1,
+          status: input.status === "IN_REVIEW" || input.status === "RETURNED_FOR_REVISION"
+            ? (input.status === "IN_REVIEW" ? "IN_REVIEW" : "RETURNED_FOR_REVISION")
+            : "PENDING_APPROVAL",
+          currentStepOrder: input.status === "RETURNED_FOR_REVISION" ? approved + 1 : Math.min(approved + 1, steps.length),
+          totalSteps: steps.length,
+          steps: { create: steps },
+        },
+        select: { id: true },
+      });
+
+      // Backfill approvals + signature snapshots for the completed steps so the
+      // audit trail and progress UI have real history to render.
+      const createdSteps = await prisma.workflowStep.findMany({
+        where: { workflowInstanceId: instance.id, status: "APPROVED" },
+        orderBy: { stepOrder: "asc" },
+        select: { id: true, stepOrder: true, approverUserId: true, approverNameSnapshot: true, approverRoleSnapshot: true, completedAt: true },
+      });
+
+      for (const step of createdSteps) {
+        const approval = await prisma.approval.create({
+          data: {
+            workflowStepId: step.id,
+            documentId: doc.id,
+            approverUserId: step.approverUserId,
+            action: "APPROVE_AND_SIGN",
+            comments: "Approved as submitted.",
+            createdAt: step.completedAt ?? new Date(),
+          },
+          select: { id: true },
+        });
+
+        await prisma.signaturePlacement.create({
+          data: {
+            workflowStepId: step.id,
+            approvalId: approval.id,
+            signerUserId: step.approverUserId,
+            signerName: step.approverNameSnapshot,
+            signerRoleSnapshot: step.approverRoleSnapshot,
+            signatureStorageId: `signatures/users/${step.approverUserId}/seed-signature.png`,
+            signatureProvider: "LOCAL_SECURE",
+            signatureUrl: "",
+            signatureSha256: `seed${step.id}`.padEnd(64, "0"),
+            pageNumber: 2,
+            x: 12 + (step.stepOrder - 1) * 22,
+            y: 72,
+            width: 20,
+            height: 6,
+            signedAt: step.completedAt ?? new Date(),
+          },
+        });
+
+        await prisma.documentAuditLog.create({
+          data: {
+            documentId: doc.id,
+            documentVersion: 1,
+            workflowStepId: step.id,
+            actorUserId: step.approverUserId,
+            action: "APPROVED_AND_SIGNED",
+            previousStatus: step.stepOrder === 1 ? "PENDING_APPROVAL" : "IN_REVIEW",
+            newStatus: "IN_REVIEW",
+            createdAt: step.completedAt ?? new Date(),
+          },
+        });
+      }
+
+      if (input.status === "RETURNED_FOR_REVISION") {
+        const activeStep = await prisma.workflowStep.findFirst({
+          where: { workflowInstanceId: instance.id, stepOrder: (approved ?? 0) + 1 },
+          select: { id: true, approverUserId: true },
+        });
+        if (activeStep) {
+          await prisma.workflowStep.update({
+            where: { id: activeStep.id },
+            data: { status: "RETURNED_FOR_REVISION", completedAt: new Date(now - 6 * 3600_000), reason: "Please attach the revised quotation." },
+          });
+          const approval = await prisma.approval.create({
+            data: {
+              workflowStepId: activeStep.id,
+              documentId: doc.id,
+              approverUserId: activeStep.approverUserId,
+              action: "REQUEST_CHANGES",
+              comments: "Please attach the revised quotation.",
+              createdAt: new Date(now - 6 * 3600_000),
+            },
+            select: { id: true },
+          });
+          await prisma.documentAuditLog.create({
+            data: {
+              documentId: doc.id,
+              documentVersion: 1,
+              workflowStepId: activeStep.id,
+              actorUserId: activeStep.approverUserId,
+              action: "CHANGES_REQUESTED",
+              previousStatus: "IN_REVIEW",
+              newStatus: "RETURNED_FOR_REVISION",
+              reason: "Please attach the revised quotation.",
+              createdAt: new Date(now - 6 * 3600_000),
+            },
+          });
+          await prisma.notification.create({
+            data: {
+              type: NotificationType.DOCUMENT_CHANGES_REQUESTED,
+              title: "Changes requested",
+              message: `"${input.title}" (${docNumber}) was returned for revision.`,
+              recipientUserId: author!.id,
+              actorUserId: activeStep.approverUserId,
+              branchId: branch0.id,
+              documentId: doc.id,
+              entityId: doc.id,
+            },
+          });
+        }
+      }
+
+      return { id: doc.id, documentNumber: docNumber };
+    }
+
+    await seedDocument({
+      title: "Purchase Request — Commercial Dishwasher",
+      description: "Requisition for two commercial-grade dishwashers for the Dhanmondi kitchen.",
+      documentTypeId: purchaseTypeId,
+      status: "DRAFT",
+      chain,
+    });
+
+    await seedDocument({
+      title: "Purchase Request — Ceiling Fan Replacement (X-05)",
+      description: "Replacement of ceiling fans in the Xindian main dining area.",
+      documentTypeId: purchaseTypeId,
+      status: "IN_REVIEW",
+      approvedSteps: 2,
+      chain,
+    });
+
+    const returned = await seedDocument({
+      title: "Leave Request — Annual Leave (Karim)",
+      description: "Annual leave application for 5 consecutive days.",
+      documentTypeId: leaveTypeId,
+      status: "RETURNED_FOR_REVISION",
+      approvedSteps: 1,
+      chain,
+    });
+
+    await seedDocument({
+      title: "Policy Notice — Revised Staff Uniform Policy",
+      description: "Internal circular announcing the revised staff uniform policy effective next quarter.",
+      documentTypeId: policyTypeId,
+      status: "PENDING_APPROVAL",
+      approvedSteps: 0,
+      chain,
+    });
+
+    console.log(`  ✓ Documents: 4 sample workflows (1 draft, 1 in review, 1 returned, 1 awaiting first approval)`);
+    console.log(`      Returned for revision → ${returned.documentNumber}`);
   }
 
   console.log("\n✅ Seeding complete.\n");

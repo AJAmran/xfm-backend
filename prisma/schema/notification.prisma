@@ -1,6 +1,14 @@
 enum NotificationType {
   MANAGER_REPORT_SUBMITTED
   INVENTORY_STATEMENT_SUBMITTED
+  DOCUMENT_SUBMITTED
+  DOCUMENT_APPROVED
+  DOCUMENT_CHANGES_REQUESTED
+  DOCUMENT_REJECTED
+  DOCUMENT_FINAL_APPROVED
+  DOCUMENT_REVISION_CREATED
+  DOCUMENT_REMINDER
+  DOCUMENT_ESCALATED
 
   @@map("notification_type")
 }
@@ -12,17 +20,25 @@ model Notification {
   message     String           @db.Text
   branchId    Int?             @map("branch_id")
   entityId    Int?             @map("entity_id")
+  documentId  Int?             @map("document_id")
+  // Addressed recipient. NULL for legacy branch-broadcast notifications
+  // (manager reports, inventory statements); set for document approvals.
+  recipientUserId Int?        @map("recipient_user_id")
   actorUserId Int?             @map("actor_user_id")
   read        Boolean          @default(false)
   readAt      DateTime?        @map("read_at")
   createdAt   DateTime         @default(now()) @map("created_at")
 
-  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  actor  User?   @relation("ActorNotifications", fields: [actorUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  branch   Branch?   @relation(fields: [branchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  actor    User?     @relation("ActorNotifications", fields: [actorUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  recipient User?    @relation("RecipientNotifications", fields: [recipientUserId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  document Document? @relation("DocumentNotifications", fields: [documentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([read])
   @@index([branchId, createdAt])
   @@index([createdAt])
   @@index([branchId, read, createdAt])
+  @@index([documentId, createdAt])
+  @@index([recipientUserId, read, createdAt])
   @@map("notifications")
 }

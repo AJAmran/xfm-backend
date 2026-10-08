@@ -1,5 +1,6 @@
 import httpStatus from "http-status";
 import { NotificationType } from "../../../generated/prisma/enums";
+import { Prisma } from "../../../generated/prisma/client";
 import { prisma } from "../../lib/prisma";
 import { appError } from "../../utils/appError";
 import { transformPagination, buildMetadata } from "../../utils/queryBuilder";
@@ -16,6 +17,7 @@ interface AuthUser {
 const NOTIFICATION_INCLUDE = {
   branch: { select: { id: true, name: true, code: true } },
   actor: { select: { id: true, name: true, role: true } },
+  document: { select: { id: true, documentNumber: true, title: true } },
 } as const;
 
 // The bell polls the feed + unread count on every load/event. Notifications
@@ -36,9 +38,27 @@ function isManager(user: AuthUser): boolean {
   return user.role === "BRANCH_MANAGER";
 }
 
-/** Branch managers only ever see notifications for their own branch. */
-function branchScope(user: AuthUser): { branchId: number } | null {
-  return isManager(user) ? { branchId: user.branchId ?? -1 } : null;
+/**
+ * Visibility scope for the bell.
+ *
+ * Two families of notification now coexist:
+ *   - branch broadcasts (`recipientUserId IS NULL`): manager reports, inventory
+ *     statements. Branch managers only ever see their own branch.
+ *   - addressed items (`recipientUserId` set): document approvals, which must
+ *     reach a corporate approver regardless of which branch raised the document.
+ */
+function visibilityScope(user: AuthUser): Prisma.NotificationWhereInput {
+  if (isManager(user)) {
+    return {
+      OR: [
+        { recipientUserId: user.id },
+        { recipientUserId: null, branchId: user.branchId ?? -1 },
+      ],
+    };
+  }
+  return {
+    OR: [{ recipientUserId: user.id }, { recipientUserId: null }],
+  };
 }
 
 export interface SubmissionNotificationInput {
@@ -83,8 +103,7 @@ export async function getPaginatedNotifications(query: NotificationQueryInput, u
 
   return withCache(key, async () => {
     const pagination = transformPagination(query);
-    const scope = branchScope(user);
-    const where: Record<string, unknown> = { ...(scope ?? {}) };
+    const where: Prisma.NotificationWhereInput = visibilityScope(user);
     if (query.unreadOnly === "true") where.read = false;
 
     const [data, total] = await prisma.$transaction([
@@ -106,6 +125,9 @@ export async function getPaginatedNotifications(query: NotificationQueryInput, u
         branchCode: n.branch?.code ?? null,
         actorName: n.actor?.name ?? null,
         entityId: n.entityId,
+        documentId: n.documentId,
+        documentNumber: n.document?.documentNumber ?? null,
+        documentTitle: n.document?.title ?? null,
         read: n.read,
         createdAt: n.createdAt.toISOString(),
       })),
@@ -118,18 +140,16 @@ export async function getUnreadCount(user: AuthUser) {
   const key = `${NOTIFICATIONS_PREFIX}unread_${notificationsScopeKey(user)}`;
 
   return withCache(key, async () => {
-    const scope = branchScope(user);
     const count = await prisma.notification.count({
-      where: { read: false, ...(scope ?? {}) },
+      where: { read: false, ...visibilityScope(user) },
     });
     return { count };
   }, NOTIFICATIONS_TTL);
 }
 
 export async function markAsRead(id: number, user: AuthUser) {
-  const scope = branchScope(user);
   const existing = await prisma.notification.findFirst({
-    where: { id, ...(scope ?? {}) },
+    where: { id, ...visibilityScope(user) },
     select: { id: true },
   });
   if (!existing) throw appError("Notification not found", httpStatus.NOT_FOUND);
@@ -143,9 +163,8 @@ export async function markAsRead(id: number, user: AuthUser) {
 }
 
 export async function markAllRead(user: AuthUser) {
-  const scope = branchScope(user);
   const result = await prisma.notification.updateMany({
-    where: { read: false, ...(scope ?? {}) },
+    where: { read: false, ...visibilityScope(user) },
     data: { read: true, readAt: new Date() },
   });
   await invalidateNotificationsCaches();
@@ -153,9 +172,8 @@ export async function markAllRead(user: AuthUser) {
 }
 
 export async function deleteNotification(id: number, user: AuthUser) {
-  const scope = branchScope(user);
   const existing = await prisma.notification.findFirst({
-    where: { id, ...(scope ?? {}) },
+    where: { id, ...visibilityScope(user) },
     select: { id: true },
   });
   if (!existing) throw appError("Notification not found", httpStatus.NOT_FOUND);

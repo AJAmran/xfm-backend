@@ -7,10 +7,14 @@
 - Deliver fast (sub-300ms) feedback submissions to maximize user experience.
 - Provide real-time dashboards and robust analytics to administrators and branch managers.
 - Maintain a scalable, type-safe, and highly optimized database architecture.
-**User Roles:** 
-- `SUPER_ADMIN`: Global access to all branches, settings, and users.
-- `ADMIN`: Regional/operational oversight.
-- `BRANCH_MANAGER`: Scoped strictly to data and insights for their assigned branch.
+**User Roles:** Ordered most junior → most senior. `src/lib/role-hierarchy.ts` is the source of truth for these ranks (re-exported by `document.logic` for the approval workflow).
+- `BRANCH_MANAGER` (10): Scoped strictly to data and insights for their assigned branch.
+- `MANAGER` (15): Global corporate department manager. No branch, no administration rights — permitted only `/auth/me`, the dashboard, notifications, realtime and the document module.
+- `ADMIN` (20): Manages branches, users, master data and approvals. May not grant a role senior to itself (see `canActOnRole`).
+- `DIRECTOR` (25): Global corporate leadership. Same surface as `MANAGER`: documents and approvals, no user/branch administration.
+- `COO` (30): Executive oversight, reports and approvals across all branches; no user administration.
+- `MD` (40): Read-only executive oversight — no approvals and no signature management.
+- `SUPER_ADMIN` (50): Full system access including settings and document administration.
 **High-Level Workflow:** Guests submit feedback via frontend (Next.js). The API validates and stores the feedback, which is subsequently aggregated into real-time dashboards, periodic reports, and excel exports for management.
 
 ## 2. System Architecture
@@ -67,7 +71,7 @@ Endpoints return: `{ data: [...], meta: { page, limit, totalRecords, totalPages,
 **Environment Variables:** Documented in `src/config/env.ts` (validated via Zod on startup). Requires `DATABASE_URL`, `JWT_*`, `PORT`.
 **Commands:** 
 - Dev Server: `npm run dev` (Runs on port 5000 by default)
-- Type Checking: `npm run lint` (`tsc --noEmit`)
+- Type Checking: `npm run typecheck` (`tsc --noEmit`)
 - Build: `npm run build` (Outputs to `dist/`)
 - Seed: `npm run seed` (Populates DB with sample branches and roles)
 

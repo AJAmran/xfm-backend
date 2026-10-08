@@ -1,6 +1,10 @@
 enum Role {
   SUPER_ADMIN
   ADMIN
+  // Corporate management tier. DIRECTOR sits above MANAGER; both are global
+  // (no branch) business roles and neither grants user or branch administration.
+  DIRECTOR
+  MANAGER
   BRANCH_MANAGER
   COO
   MD

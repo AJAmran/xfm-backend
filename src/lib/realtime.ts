@@ -1,16 +1,12 @@
 import { ServerResponse } from "http";
 import { randomUUID } from "crypto";
+import { Role as PrismaRole } from "../../generated/prisma/enums";
 import { logger } from "./logger";
 
-export const Role = {
-  SUPER_ADMIN: "SUPER_ADMIN",
-  ADMIN: "ADMIN",
-  BRANCH_MANAGER: "BRANCH_MANAGER",
-  COO: "COO",
-  MD: "MD",
-} as const;
-
-export type Role = (typeof Role)[keyof typeof Role];
+// Re-exported rather than re-declared: a hand-rolled copy of the Role enum here
+// would silently drift from Prisma's, and `tsc` could not catch it.
+export const Role = PrismaRole;
+export type Role = (typeof PrismaRole)[keyof typeof PrismaRole];
 
 /** Scope attached to an event so recipients can be filtered. */
 export type RealtimeScope =
@@ -113,7 +109,9 @@ export class RealtimeHub {
       return true;
     }
 
-    // Branch managers: global events + events for their own branch.
+    // Corporate management (DIRECTOR / MANAGER) is global with no branch, so it
+    // receives global events only — never a single branch's operational events.
+    // Branch managers get global events plus their own branch.
     if (event.type === "global") return true;
     if (event.type === "branch") return event.branchId === (sub.branchId ?? undefined);
 

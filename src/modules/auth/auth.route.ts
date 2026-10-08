@@ -11,6 +11,20 @@ const route = Router();
 route.post("/login", authLimiter, validateSchema({ body: loginValidationSchema }), authController.login);
 route.post("/refresh-token", authController.refreshToken);
 route.post("/logout", authController.logout);
-route.get("/me", authGuard(Role.SUPER_ADMIN, Role.ADMIN, Role.BRANCH_MANAGER, Role.COO, Role.MD), authController.me);
+// `/me` is what the dashboard's auth gate calls. Every role that can hold a
+// session must be listed, otherwise the gate bounces the user to /login.
+route.get(
+  "/me",
+  authGuard(
+    Role.SUPER_ADMIN,
+    Role.ADMIN,
+    Role.DIRECTOR,
+    Role.MANAGER,
+    Role.BRANCH_MANAGER,
+    Role.COO,
+    Role.MD,
+  ),
+  authController.me,
+);
 
 export const AuthRoutes = route;

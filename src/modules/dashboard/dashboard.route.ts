@@ -7,7 +7,20 @@ import { Role } from "../../../generated/prisma/enums";
 
 const router = Router();
 
-router.use(authGuard(Role.SUPER_ADMIN, Role.ADMIN, Role.BRANCH_MANAGER, Role.COO, Role.MD));
+// Corporate management (DIRECTOR / MANAGER) is global with no branch, so it can
+// read the cross-branch overview but not the branch ranking, which is scoped to
+// the administration/executive tier.
+router.use(
+  authGuard(
+    Role.SUPER_ADMIN,
+    Role.ADMIN,
+    Role.DIRECTOR,
+    Role.MANAGER,
+    Role.BRANCH_MANAGER,
+    Role.COO,
+    Role.MD,
+  ),
+);
 
 router.get("/summary", validateSchema({ query: dashboardQuerySchema }), dashboardController.summary);
 router.get("/recent-feedback", validateSchema({ query: dashboardQuerySchema }), dashboardController.recentFeedback);

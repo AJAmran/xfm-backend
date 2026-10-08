@@ -18,8 +18,9 @@ model Branch {
   guestDiscountLogs           GuestDiscountLog[]
   guestEntertainmentLogs      GuestEntertainmentLog[]
   monthlyInventoryStatements  MonthlyInventoryStatement[]
-  notifications               Notification[]
-  bookings                    Booking[]
+notifications Notification[]
+  bookings Booking[]
+  documents Document[]
 
   @@index([code, isActive])
   @@index([isDeleted])
