@@ -27,7 +27,7 @@ export async function update(req: Request, res: Response) {
 }
 
 export async function remove(req: Request, res: Response) {
-  await userService.deleteUser(Number(req.params.id));
+  await userService.deleteUser(Number(req.params.id), req.user!);
   successResponse(res, "User deleted successfully", {});
 }
 

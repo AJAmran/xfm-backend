@@ -5,6 +5,13 @@ import { prisma } from "../../lib/prisma";
 import { appError } from "../../utils/appError";
 import env from "../../config/env";
 import { formatDateOnly, toDateOnly, toEndOfDay, toMonthStart, toNextMonthStart } from "../../utils/dateHelpers";
+import { withCache } from "../../lib/cache";
+
+// Report views are opened on demand (never on a realtime loop), so a short
+// 120s cache is plenty and no cross-invalidation is wired: worst case a
+// report opened within 2 minutes of new data shows pre-submit numbers.
+// Excel exports deliberately bypass this cache — an explicit export must
+// always reflect the live database.
 
 /** Human-readable labels for the AgeGroup enum (used in Excel exports). */
 export const AGE_GROUP_LABELS: Record<string, string> = {
@@ -47,56 +54,68 @@ async function getPeriodSummary(start: Date, end: Date, branchId?: number) {
 }
 
 export async function getDailyReport(branchId?: number) {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const end = new Date(start.getTime() + 86400000);
+  const key = `reports_daily_${branchId ?? "all"}`;
+  return withCache(key, async () => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const end = new Date(start.getTime() + 86400000);
 
-  const [summary, feedbacks] = await Promise.all([
-    getPeriodSummary(start, end, branchId),
-    getFeedbacksInRange(start, end, branchId),
-  ]);
+    const [summary, feedbacks] = await Promise.all([
+      getPeriodSummary(start, end, branchId),
+      getFeedbacksInRange(start, end, branchId),
+    ]);
 
-  return { period: "daily", date: start.toISOString().slice(0, 10), summary, feedbacks };
+    return { period: "daily", date: start.toISOString().slice(0, 10), summary, feedbacks };
+  }, 120);
 }
 
 export async function getWeeklyReport(branchId?: number) {
-  const now = new Date();
-  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  const start = new Date(end.getTime() - 7 * 86400000);
+  const key = `reports_weekly_${branchId ?? "all"}`;
+  return withCache(key, async () => {
+    const now = new Date();
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const start = new Date(end.getTime() - 7 * 86400000);
 
-  const [summary, feedbacks] = await Promise.all([
-    getPeriodSummary(start, end, branchId),
-    getFeedbacksInRange(start, end, branchId),
-  ]);
+    const [summary, feedbacks] = await Promise.all([
+      getPeriodSummary(start, end, branchId),
+      getFeedbacksInRange(start, end, branchId),
+    ]);
 
-  return { period: "weekly", start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10), summary, feedbacks };
+    return { period: "weekly", start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10), summary, feedbacks };
+  }, 120);
 }
 
 export async function getMonthlyReport(branchId?: number) {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const key = `reports_monthly_${branchId ?? "all"}`;
+  return withCache(key, async () => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-  const [summary, feedbacks] = await Promise.all([
-    getPeriodSummary(start, end, branchId),
-    getFeedbacksInRange(start, end, branchId),
-  ]);
+    const [summary, feedbacks] = await Promise.all([
+      getPeriodSummary(start, end, branchId),
+      getFeedbacksInRange(start, end, branchId),
+    ]);
 
-  return { period: "monthly", month: start.toISOString().slice(0, 7), summary, feedbacks };
+    return { period: "monthly", month: start.toISOString().slice(0, 7), summary, feedbacks };
+  }, 120);
 }
 
 export async function getBranchReport(branchId: number) {
-  const branch = await prisma.branch.findUnique({ where: { id: branchId, isDeleted: false } });
-  if (!branch) throw appError("Branch not found", httpStatus.NOT_FOUND);
+  const key = `reports_branch_${branchId}`;
+  return withCache(key, async () => {
+    const branch = await prisma.branch.findUnique({ where: { id: branchId, isDeleted: false } });
+    if (!branch) throw appError("Branch not found", httpStatus.NOT_FOUND);
 
-  const [total, avg, negative, recent] = await Promise.all([
-    prisma.guestFeedback.count({ where: { branchId } }),
-    prisma.guestFeedback.aggregate({ where: { branchId }, _avg: { overallRating: true } }),
-    prisma.guestFeedback.count({ where: { branchId, overallRating: { lte: 2 } } }),
-    prisma.guestFeedback.findMany({ where: { branchId }, orderBy: { submittedAt: "desc" }, take: 20 }),
-  ]);
+    const [total, avg, negative, recent] = await Promise.all([
+      prisma.guestFeedback.count({ where: { branchId } }),
+      prisma.guestFeedback.aggregate({ where: { branchId }, _avg: { overallRating: true } }),
+      prisma.guestFeedback.count({ where: { branchId, overallRating: { lte: 2 } } }),
+      prisma.guestFeedback.findMany({ where: { branchId }, orderBy: { submittedAt: "desc" }, take: 20 }),
+    ]);
 
-  return { branch, summary: { total, averageRating: avg._avg.overallRating, negativeCount: negative }, recentFeedbacks: recent };
+    return { branch, summary: { total, averageRating: avg._avg.overallRating, negativeCount: negative }, recentFeedbacks: recent };
+  }, 120);
 }
 
 export async function exportExcel(branchId?: number, startDate?: string, endDate?: string) {

@@ -135,8 +135,11 @@ export async function updateDiscountLog(id: number, payload: GuestDiscountUpdate
   if (!existing || existing.isDeleted) throw appError("Discount log not found", httpStatus.NOT_FOUND);
   if (isManager(user)) {
     if (existing.branchId !== user.branchId) throw appError("Forbidden: own branch only", httpStatus.FORBIDDEN);
-    if (existing.approvalStatus !== "PENDING") throw appError("Approved or rejected logs cannot be edited", httpStatus.CONFLICT);
   }
+  // Only decided (APPROVED) records are immutable for everyone: rejected
+  // logs stay editable so corrections can be resubmitted for approval
+  // (same resubmit loop as manager reports).
+  if (existing.approvalStatus === "APPROVED") throw appError("Approved logs cannot be edited", httpStatus.CONFLICT);
 
   const data: Prisma.GuestDiscountLogUpdateInput = {};
   const totalBill = payload.totalBill ?? Number(existing.totalBill);
@@ -271,8 +274,10 @@ export async function updateEntertainmentLog(id: number, payload: GuestEntertain
   if (!existing || existing.isDeleted) throw appError("Entertainment log not found", httpStatus.NOT_FOUND);
   if (isManager(user)) {
     if (existing.branchId !== user.branchId) throw appError("Forbidden: own branch only", httpStatus.FORBIDDEN);
-    if (existing.approvalStatus !== "PENDING") throw appError("Approved or rejected logs cannot be edited", httpStatus.CONFLICT);
   }
+  // Only decided (APPROVED) records are immutable for everyone: rejected
+  // logs stay editable so corrections can be resubmitted for approval.
+  if (existing.approvalStatus === "APPROVED") throw appError("Approved logs cannot be edited", httpStatus.CONFLICT);
 
   const data: Prisma.GuestEntertainmentLogUpdateInput = {};
   if (payload.logDate !== undefined) data.logDate = toDateOnly(payload.logDate);

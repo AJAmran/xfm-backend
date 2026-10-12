@@ -79,13 +79,15 @@ const signatureUpload = multer({
  *
  * Corporate management (DIRECTOR / MANAGER) is included because this module is
  * what they were added for: they create documents and approve them. They hold
- * no user- or branch-administration rights.
+ * no user- or branch-administration rights. DOCUMENT_OFFICER (department heads
+ * on document duty) shares exactly the MANAGER surface.
  */
 const moduleGuard = authGuard(
   Role.SUPER_ADMIN,
   Role.ADMIN,
   Role.DIRECTOR,
-  Role.MANAGER,
+    Role.MANAGER,
+    Role.DOCUMENT_OFFICER,
   Role.BRANCH_MANAGER,
   Role.COO,
   Role.MD,
@@ -98,7 +100,8 @@ const writeGuard = authGuard(
   Role.SUPER_ADMIN,
   Role.ADMIN,
   Role.DIRECTOR,
-  Role.MANAGER,
+    Role.MANAGER,
+    Role.DOCUMENT_OFFICER,
   Role.BRANCH_MANAGER,
   Role.COO,
 );
@@ -112,7 +115,8 @@ const approveGuard = authGuard(
   Role.SUPER_ADMIN,
   Role.ADMIN,
   Role.DIRECTOR,
-  Role.MANAGER,
+    Role.MANAGER,
+    Role.DOCUMENT_OFFICER,
   Role.BRANCH_MANAGER,
   Role.COO,
 );

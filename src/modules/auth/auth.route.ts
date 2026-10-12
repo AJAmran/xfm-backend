@@ -9,8 +9,8 @@ import { loginValidationSchema } from "./auth.validation";
 const route = Router();
 
 route.post("/login", authLimiter, validateSchema({ body: loginValidationSchema }), authController.login);
-route.post("/refresh-token", authController.refreshToken);
-route.post("/logout", authController.logout);
+route.post("/refresh-token", authLimiter, authController.refreshToken);
+route.post("/logout", authLimiter, authController.logout);
 // `/me` is what the dashboard's auth gate calls. Every role that can hold a
 // session must be listed, otherwise the gate bounces the user to /login.
 route.get(
@@ -20,6 +20,7 @@ route.get(
     Role.ADMIN,
     Role.DIRECTOR,
     Role.MANAGER,
+    Role.DOCUMENT_OFFICER,
     Role.BRANCH_MANAGER,
     Role.COO,
     Role.MD,

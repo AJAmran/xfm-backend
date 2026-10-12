@@ -129,7 +129,7 @@ export const documentQuerySchema = z
   .object({
     page: z.string().optional().default("1"),
     limit: z.string().optional().default("20"),
-    sortBy: z.string().optional().default("updatedAt"),
+    sortBy: z.enum(["updatedAt", "createdAt", "submittedAt", "title", "status"]).optional().default("updatedAt"),
     sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
     status: z
       .enum([

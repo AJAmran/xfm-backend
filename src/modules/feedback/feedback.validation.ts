@@ -21,7 +21,10 @@ export const createFeedbackSchema = z.object({
 export const feedbackQuerySchema = z.object({
   page: z.string().optional().default("1"),
   limit: z.string().optional().default("10"),
-  sortBy: z.string().optional().default("submittedAt"),
+  sortBy: z
+    .enum(["submittedAt", "overallRating", "foodRating", "serviceRating", "environmentRating", "eventRating"])
+    .optional()
+    .default("submittedAt"),
   sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
   branchId: z.string().optional(),
   rating: z.string().optional(),

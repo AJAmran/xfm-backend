@@ -52,117 +52,133 @@ export async function getOperationalWidgets(branchId?: number) {
 }
 
 export async function getSummary(branchId?: number, startDate?: string, endDate?: string) {
-  const params = { branchId, startDate, endDate };
-  const where = buildFeedbackWhere(params);
+  // The dashboard home + every realtime refresh hit this (one raw aggregate
+  // + one list = ~2 remote-DB round-trips). 60s cache; busted with the
+  // analytics family on feedback submit (key shares the dashboard_home_
+  // prefix — see analytics.service.ts).
+  const key = `dashboard_home_summary_${branchId ?? "all"}_${startDate ?? "none"}_${endDate ?? "none"}`;
+  return withCache(key, async () => {
+    const params = { branchId, startDate, endDate };
+    const where = buildFeedbackWhere(params);
 
-  const [stats, recent] = await Promise.all([
-    getRatingStats(params),
-    prisma.guestFeedback.findMany({
-      where,
-      orderBy: { submittedAt: "desc" },
-      take: 10,
-      select: {
-        id: true,
-        guestName: true,
-        overallRating: true,
-        submittedAt: true,
-        opinion: true,
-        branch: { select: { name: true, code: true } },
-      },
-    }),
-  ]);
+    const [stats, recent] = await Promise.all([
+      getRatingStats(params),
+      prisma.guestFeedback.findMany({
+        where,
+        orderBy: { submittedAt: "desc" },
+        take: 10,
+        select: {
+          id: true,
+          guestName: true,
+          overallRating: true,
+          submittedAt: true,
+          opinion: true,
+          branch: { select: { name: true, code: true } },
+        },
+      }),
+    ]);
 
-  return {
-    totalFeedbacks: stats.totalFeedbacks,
-    averageRatings: stats.averages,
-    negativeFeedbackCount: getNegativeCount(stats.distribution),
-    ratingDistribution: stats.distribution,
-    recentFeedbacks: recent,
-  };
+    return {
+      totalFeedbacks: stats.totalFeedbacks,
+      averageRatings: stats.averages,
+      negativeFeedbackCount: getNegativeCount(stats.distribution),
+      ratingDistribution: stats.distribution,
+      recentFeedbacks: recent,
+    };
+  }, 60);
 }
 
 export async function getRecentFeedback(branchId?: number, startDate?: string, endDate?: string) {
-  const where = buildFeedbackWhere({ branchId, startDate, endDate });
+  const key = `dashboard_home_recent_${branchId ?? "all"}_${startDate ?? "none"}_${endDate ?? "none"}`;
+  return withCache(key, async () => {
+    const where = buildFeedbackWhere({ branchId, startDate, endDate });
 
-  return prisma.guestFeedback.findMany({
-    where,
-    orderBy: { submittedAt: "desc" },
-    take: 20,
-    select: {
-      id: true,
-      guestName: true,
-      contact: true,
-      overallRating: true,
-      foodRating: true,
-      serviceRating: true,
-      environmentRating: true,
-      eventRating: true,
-      opinion: true,
-      submittedAt: true,
-      branch: { select: { name: true, code: true } },
-    },
-  });
-}
-
-export async function getBranchRanking(startDate?: string, endDate?: string) {
-  const where = buildFeedbackWhere({ startDate, endDate });
-
-  const [ranking, branches] = await Promise.all([
-    prisma.guestFeedback.groupBy({
-      by: ["branchId"],
+    return prisma.guestFeedback.findMany({
       where,
-      _avg: {
+      orderBy: { submittedAt: "desc" },
+      take: 20,
+      select: {
+        id: true,
+        guestName: true,
+        contact: true,
         overallRating: true,
         foodRating: true,
         serviceRating: true,
         environmentRating: true,
         eventRating: true,
+        opinion: true,
+        submittedAt: true,
+        branch: { select: { name: true, code: true } },
       },
-      _count: true,
-      orderBy: { _avg: { overallRating: "desc" } },
-    }),
-    prisma.branch.findMany({
-      where: { isDeleted: false },
-      select: { id: true, name: true, code: true },
-    }),
-  ]);
+    });
+  }, 30);
+}
 
-  const branchMap = new Map(branches.map((b) => [b.id, { name: b.name, code: b.code }]));
+export async function getBranchRanking(startDate?: string, endDate?: string) {
+  const key = `dashboard_home_ranking_${startDate ?? "none"}_${endDate ?? "none"}`;
+  return withCache(key, async () => {
+    const where = buildFeedbackWhere({ startDate, endDate });
 
-  return ranking.map((r) => ({
-    branchId: r.branchId,
-    branch: branchMap.get(r.branchId) ?? null,
-    totalFeedbacks: r._count,
-    averageRatings: r._avg,
-  }));
+    const [ranking, branches] = await Promise.all([
+      prisma.guestFeedback.groupBy({
+        by: ["branchId"],
+        where,
+        _avg: {
+          overallRating: true,
+          foodRating: true,
+          serviceRating: true,
+          environmentRating: true,
+          eventRating: true,
+        },
+        _count: true,
+        orderBy: { _avg: { overallRating: "desc" } },
+      }),
+      prisma.branch.findMany({
+        where: { isDeleted: false },
+        select: { id: true, name: true, code: true },
+      }),
+    ]);
+
+    const branchMap = new Map(branches.map((b) => [b.id, { name: b.name, code: b.code }]));
+
+    return ranking.map((r) => ({
+      branchId: r.branchId,
+      branch: branchMap.get(r.branchId) ?? null,
+      totalFeedbacks: r._count,
+      averageRatings: r._avg,
+    }));
+  }, 120);
 }
 
 export async function getNegativeFeedback(branchId?: number, startDate?: string, endDate?: string) {
-  const where: Prisma.GuestFeedbackWhereInput = { overallRating: { lte: 2 } };
-  if (branchId) where.branchId = branchId;
-  if (startDate || endDate) {
-    const dateFilter: Prisma.DateTimeFilter<"GuestFeedback"> = {};
-    if (startDate) dateFilter.gte = new Date(startDate);
-    if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      dateFilter.lte = end;
+  const key = `dashboard_home_negative_${branchId ?? "all"}_${startDate ?? "none"}_${endDate ?? "none"}`;
+  return withCache(key, async () => {
+    const where: Prisma.GuestFeedbackWhereInput = { overallRating: { lte: 2 } };
+    if (branchId) where.branchId = branchId;
+    if (startDate || endDate) {
+      const dateFilter: Prisma.DateTimeFilter<"GuestFeedback"> = {};
+      if (startDate) dateFilter.gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        dateFilter.lte = end;
+      }
+      where.submittedAt = dateFilter;
     }
-    where.submittedAt = dateFilter;
-  }
 
-  return prisma.guestFeedback.findMany({
-    where,
-    orderBy: { submittedAt: "desc" },
-    take: 50,
-    select: {
-      id: true,
-      guestName: true,
-      contact: true,
-      overallRating: true,
-      opinion: true,
-      submittedAt: true,
-      branch: { select: { name: true, code: true } },
-    },
-  });
+    return prisma.guestFeedback.findMany({
+      where,
+      orderBy: { submittedAt: "desc" },
+      take: 50,
+      select: {
+        id: true,
+        guestName: true,
+        contact: true,
+        overallRating: true,
+        opinion: true,
+        submittedAt: true,
+        branch: { select: { name: true, code: true } },
+      },
+    });
+  }, 30);
 }

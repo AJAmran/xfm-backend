@@ -98,9 +98,11 @@ export async function updateUser(id: number, payload: UpdateUserInput, caller: A
     if (payload.role && payload.role !== Role.SUPER_ADMIN) {
       throw appError("You cannot demote your own Super Admin account", httpStatus.FORBIDDEN);
     }
-    if (payload.isActive === false) {
-      throw appError("You cannot deactivate your own account", httpStatus.FORBIDDEN);
-    }
+  }
+  // Nobody may deactivate their own account from any endpoint (mirrors the
+  // PATCH /:id/status self-check below).
+  if (caller.id === existing.id && payload.isActive === false) {
+    throw appError("You cannot deactivate your own account", httpStatus.FORBIDDEN);
   }
 
   if (payload.email && payload.email !== existing.email) {
@@ -130,11 +132,22 @@ export async function updateUser(id: number, payload: UpdateUserInput, caller: A
  * Soft-deletes a user using a single UPDATE query.
  * Relies on the global error handler to catch P2025 (record not found).
  */
-export async function deleteUser(id: number) {
+export async function deleteUser(id: number, caller: AuthUser) {
   const existing = await userRepo.findUserById(id);
   if (!existing) throw appError("User not found", httpStatus.NOT_FOUND);
   if (existing.role === Role.SUPER_ADMIN) {
     throw appError("Super Admin accounts cannot be deleted", httpStatus.FORBIDDEN);
+  }
+  if (caller.id === existing.id) {
+    throw appError("You cannot delete your own account", httpStatus.FORBIDDEN);
+  }
+  // Same seniority rule as updateUser: you may not delete an account that
+  // outranks you (no deleting your boss or a peer above your pay grade).
+  if (!canActOnRole(caller.role, existing.role)) {
+    throw appError(
+      `You cannot delete a "${existing.role}" account because it outranks your own role`,
+      httpStatus.FORBIDDEN,
+    );
   }
   await userRepo.softDeleteUser(id);
   publishDataChanged("user.deleted", { type: "global" });
@@ -155,6 +168,14 @@ export async function setUserStatus(id: number, isActive: boolean, caller: AuthU
   }
   if (caller.id === existing.id && !isActive) {
     throw appError("You cannot deactivate your own account", httpStatus.FORBIDDEN);
+  }
+  // Same seniority rule as updateUser: suspending an executive is a
+  // privileged act, not a peer operation.
+  if (!canActOnRole(caller.role, existing.role)) {
+    throw appError(
+      `You cannot change the status of a "${existing.role}" account because it outranks your own role`,
+      httpStatus.FORBIDDEN,
+    );
   }
 
   const user = await userRepo.updateUserStatus(id, isActive);

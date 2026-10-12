@@ -24,7 +24,7 @@ export const updateBranchSchema = z.object({
 export const branchQuerySchema = z.object({
   page: z.string().optional().default("1"),
   limit: z.string().optional().default("10"),
-  sortBy: z.string().optional().default("createdAt"),
+  sortBy: z.enum(["name", "code", "createdAt"]).optional().default("createdAt"),
   sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
   search: z.string().optional(),
   isActive: z.string().transform((v) => v === "true").optional(),
@@ -33,6 +33,8 @@ export const branchQuerySchema = z.object({
 export const branchStatusSchema = z.object({
   isActive: z.boolean(),
 });
+
+export const branchIdParamSchema = z.object({ id: z.string().regex(/^\d+$/, "Invalid id") }).strict();
 
 export type CreateBranchInput = z.infer<typeof createBranchSchema>;
 export type UpdateBranchInput = z.infer<typeof updateBranchSchema>;

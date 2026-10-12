@@ -26,7 +26,7 @@ export interface CorporateUserSeed {
   passwordEnv: string;
   department: string;
   designation: string;
-  role: "MD" | "DIRECTOR" | "COO" | "MANAGER";
+  role: "MD" | "DIRECTOR" | "COO" | "MANAGER" | "DOCUMENT_OFFICER";
   signatureImageUrl?: string;
   /**
    * Resolve the existing account by ROLE instead of by name.
@@ -44,7 +44,7 @@ export const CORPORATE_USERS: CorporateUserSeed[] = [
     email: "md@x-grouprestaurant.com",
     passwordEnv: "CORPORATE_PW_MD",
     department: "Management",
-    designation: "MD",
+    designation: "Proprietor",
     role: "MD",
     matchByRole: true,
   },

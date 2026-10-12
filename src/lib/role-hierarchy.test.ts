@@ -39,6 +39,15 @@ describe("canActOnRole — privilege escalation guard", () => {
       assert.equal(canActOnRole(role, role), true, `${role} should equal itself`);
     }
   });
+
+  it("places DOCUMENT_OFFICER just above BRANCH_MANAGER", () => {
+    assert.equal(canActOnRole("ADMIN", "DOCUMENT_OFFICER"), true);
+    assert.equal(canActOnRole("MANAGER", "DOCUMENT_OFFICER"), true);
+    assert.equal(canActOnRole("DOCUMENT_OFFICER", "DOCUMENT_OFFICER"), true);
+    assert.equal(canActOnRole("DOCUMENT_OFFICER", "MANAGER"), false);
+    assert.equal(canActOnRole("DOCUMENT_OFFICER", "ADMIN"), false);
+    assert.equal(canActOnRole("BRANCH_MANAGER", "DOCUMENT_OFFICER"), false);
+  });
 });
 
 describe("role hierarchy table", () => {

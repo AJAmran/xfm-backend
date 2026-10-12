@@ -37,7 +37,7 @@ export const updateManagerReportSchema = z.object({
 export const managerReportQuerySchema = z.object({
   page: z.string().optional().default("1"),
   limit: z.string().optional().default("10"),
-  sortBy: z.string().optional().default("reportDate"),
+  sortBy: z.enum(["reportDate", "createdAt", "managerName"]).optional().default("reportDate"),
   sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
   branchId: z.string().optional(),
   managerName: z.string().optional(),

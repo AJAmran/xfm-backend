@@ -5,6 +5,9 @@ enum Role {
   // (no branch) business roles and neither grants user or branch administration.
   DIRECTOR
   MANAGER
+  // Document-processing tier: department heads who work documents
+  // (submit, approve, sign) and nothing else. Same surface as MANAGER.
+  DOCUMENT_OFFICER
   BRANCH_MANAGER
   COO
   MD

@@ -35,7 +35,7 @@ export const inventoryStatementCreateSchema = z.object({
 export const inventoryStatementQuerySchema = z.object({
   page: z.string().optional().default("1"),
   limit: z.string().optional().default("10"),
-  sortBy: z.string().optional().default("statementMonth"),
+  sortBy: z.enum(["statementMonth", "status", "submittedAt", "createdAt"]).optional().default("statementMonth"),
   sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
   branchId: z.string().optional(),
   statementMonth: z.string().optional(),
@@ -46,7 +46,7 @@ export const inventoryItemQuerySchema = z.object({
   categoryId: z.string().optional(),
   page: z.string().optional().default("1"),
   limit: z.string().optional().default("100"),
-  sortBy: z.string().optional().default("sortOrder"),
+  sortBy: z.enum(["sortOrder", "name", "createdAt"]).optional().default("sortOrder"),
   sortOrder: z.enum(["asc", "desc"]).optional().default("asc"),
 }).strict();
 

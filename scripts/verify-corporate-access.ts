@@ -80,7 +80,7 @@ runScript("🔐 Corporate access verification", async (prisma) => {
     where: { email: "director@x-grouprestaurant.com", isDeleted: false },
   });
   const manager = await prisma.user.findFirst({
-    where: { email: "zilhaj.pervez@x-grouprestaurant.com", isDeleted: false },
+    where: { email: "reasad.ahmed@x-grouprestaurant.com", isDeleted: false },
   });
 
   if (!director || !manager) {
@@ -125,7 +125,7 @@ runScript("🔐 Corporate access verification", async (prisma) => {
   console.log("\n▸ Authentication");
   check(
     "new MANAGER logs in with the supplied password",
-    (await login(manager.email, process.env.CORPORATE_PW_ZILHAJ ?? "")) !== null,
+    (await login(manager.email, process.env.CORPORATE_PW_REASAD ?? "")) !== null,
   );
 
   // The DIRECTOR's address was moved off the seeded `admin@` placeholder.

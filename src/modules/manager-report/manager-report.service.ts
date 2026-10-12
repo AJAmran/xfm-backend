@@ -7,7 +7,9 @@ import { formatDateOnly, toDateOnly, toEndOfDay } from "../../utils/dateHelpers"
 import { publishDataChanged } from "../../lib/realtime";
 import { withCache, invalidateByPrefix } from "../../lib/cache";
 import * as notificationService from "../notification/notification.service";
-import { NotificationType } from "../../../generated/prisma/enums";
+import { NotificationType, Role } from "../../../generated/prisma/enums";
+import { sendApprovalMail } from "../../lib/approval-mailer";
+import { logger } from "../../lib/logger";
 import {
   CreateManagerReportInput,
   UpdateManagerReportInput,
@@ -46,6 +48,42 @@ function reportsListKey(query: ManagerReportQueryInput, user: AuthUser): string 
 
 async function invalidateReportsListCaches(): Promise<void> {
   await invalidateByPrefix(REPORTS_LIST_PREFIX);
+}
+
+/**
+ * Whoever approves manager reports gets mail on submit (all active
+ * SUPER_ADMIN / ADMIN / COO accounts except the submitter), and the creator
+ * gets mail on approval. Fire-and-forget via sendApprovalMail (never throws).
+ */
+async function mailReportApprovers(
+  submitterId: number,
+  report: { branch: { name: string }; managerName: string; reportDate: Date },
+): Promise<void> {
+  try {
+    const approvers = await prisma.user.findMany({
+      where: { role: { in: [Role.SUPER_ADMIN, Role.ADMIN, Role.COO] }, isActive: true, isDeleted: false },
+      select: { id: true },
+      take: 50,
+    });
+    for (const approver of approvers) {
+      if (approver.id === submitterId) continue;
+      void sendApprovalMail({
+        toUserId: approver.id,
+        subject: `New manager report needs review (X-Group Reports)`,
+        heading: "Manager report submitted",
+        intro: `${report.managerName} submitted the daily report for ${report.branch.name}.`,
+        rows: [
+          { label: "Branch", value: report.branch.name },
+          { label: "Date", value: formatDateOnly(report.reportDate) },
+          { label: "Submitted by", value: report.managerName },
+        ],
+        ctaLabel: "Review report",
+        ctaPath: "/dashboard/manager-report",
+      });
+    }
+  } catch (error) {
+    logger.warn({ err: error }, "manager-report submit mail skipped; report unaffected");
+  }
 }
 
 function formatReport<T extends { reportDate: Date }>(report: T): T {
@@ -153,6 +191,12 @@ export async function createReport(payload: CreateManagerReportInput, user: Auth
         actorUserId: user.id,
       });
     }
+    // Whoever approves gets mail on submit (fire-and-forget, never throws).
+    void mailReportApprovers(user.id, {
+      branch: { name: report.branch.name },
+      managerName: report.managerName,
+      reportDate,
+    });
     return formatReport(report);
   }
 
@@ -175,6 +219,11 @@ export async function createReport(payload: CreateManagerReportInput, user: Auth
       actorUserId: user.id,
     });
   }
+  void mailReportApprovers(user.id, {
+    branch: { name: report.branch.name },
+    managerName: report.managerName,
+    reportDate,
+  });
   return formatReport(report);
 }
 
@@ -257,9 +306,11 @@ export async function updateReport(id: number, payload: UpdateManagerReportInput
     if (existing.branchId !== user.branchId) {
       throw appError("Forbidden: You can only edit reports for your own branch", httpStatus.FORBIDDEN);
     }
-    if (existing.approvalStatus === "APPROVED") {
-      throw appError("Approved reports cannot be edited", httpStatus.CONFLICT);
-    }
+  }
+  // An approved report is immutable for everyone (rejected ones stay
+  // editable so corrections can be resubmitted for approval).
+  if (existing.approvalStatus === "APPROVED") {
+    throw appError("Approved reports cannot be edited", httpStatus.CONFLICT);
   }
 
   const targetDate = payload.reportDate !== undefined ? toDateOnly(payload.reportDate) : existing.reportDate;
@@ -366,6 +417,29 @@ export async function setReportApproval(id: number, payload: ApprovalStatusInput
 
   publishDataChanged("manager-report.approved", { type: "branch", branchId: existing.branchId });
   await invalidateReportsListCaches();
+  // The creator gets mail on decision (fire-and-forget, never throws).
+  if (report.createdByUserId !== user.id) {
+    const decided = payload.approvalStatus === "APPROVED" ? "approved" : "rejected";
+    void sendApprovalMail({
+      toUserId: report.createdByUserId,
+      subject: `Manager report ${decided} (X-Group Reports)`,
+      heading: `Report ${decided}`,
+      intro: `${report.approvedBy?.name ?? "An approver"} ${decided} the daily report for ${report.branch.name}.`,
+      rows: [
+        { label: "Branch", value: report.branch.name },
+        {
+          label: "Date",
+          value:
+            typeof report.reportDate === "string" ? report.reportDate : formatDateOnly(report.reportDate),
+        },
+        ...(payload.approvalStatus === "REJECTED" && payload.approvalComment
+          ? [{ label: "Reason", value: payload.approvalComment }]
+          : []),
+      ],
+      ctaLabel: "View report",
+      ctaPath: "/dashboard/manager-report",
+    });
+  }
   return formatReport(report);
 }
 

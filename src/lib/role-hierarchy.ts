@@ -12,7 +12,8 @@
  * manager/head, DIRECTOR is corporate leadership, COO is the general-manager
  * tier, MD is the final authority and SUPER_ADMIN is the top administrative
  * authority (it outranks MD so a system-administrator escalation path also
- * satisfies junior-to-senior).
+ * satisfies junior-to-senior). DOCUMENT_OFFICER sits just above
+ * BRANCH_MANAGER: department heads who process documents and nothing else.
  *
  * Every pre-existing relative order is preserved: the new roles were inserted as
  * extra rungs rather than re-numbering, so approval chains built before those
@@ -20,6 +21,7 @@
  */
 export const ROLE_HIERARCHY_RANK = {
   BRANCH_MANAGER: 10,
+  DOCUMENT_OFFICER: 12,
   MANAGER: 15,
   ADMIN: 20,
   DIRECTOR: 25,

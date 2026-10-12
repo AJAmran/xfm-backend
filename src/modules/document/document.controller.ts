@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import httpStatus from "http-status";
 import { createReadStream } from "node:fs";
+import { Readable } from "node:stream";
 import * as documentService from "./document.service";
 import { getDocumentPolicy, updateDocumentPolicy } from "./document-policy.service";
 import { getAuditFeed, getAuditActions } from "./document-audit.service";
@@ -235,8 +236,27 @@ export async function download(req: Request, res: Response) {
     sendFile(res, target.fileName, target.contentType, target.localPath, target.byteLength);
     return;
   }
-  // Cloudinary: a short-lived signed URL keeps the asset itself private.
-  res.redirect(httpStatus.FOUND, target.url!);
+  // Cloudinary: proxy the bytes through the API, never redirect. A redirect
+  // hands the browser an extensionless public_id URL served as
+  // application/octet-stream, which renders blank inside <object> previews
+  // and downloads as a file the OS cannot open. Proxying lets us send the
+  // real Content-Type and filename, identical to the local path above.
+  // Streaming (not buffering) keeps memory flat for large files.
+  const upstream = await fetch(target.url!);
+  if (!upstream.ok || !upstream.body) {
+    throw appError("The stored file could not be retrieved from storage", httpStatus.BAD_GATEWAY);
+  }
+  res.setHeader("Content-Type", target.contentType);
+  res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(target.fileName)}"`);
+  res.setHeader("Cache-Control", "private, no-store");
+  const upstreamLength = upstream.headers.get("content-length");
+  if (upstreamLength) res.setHeader("Content-Length", upstreamLength);
+  const stream = Readable.fromWeb(upstream.body as never);
+  stream.on("error", () => {
+    if (!res.headersSent) res.status(httpStatus.BAD_GATEWAY);
+    res.destroy();
+  });
+  stream.pipe(res);
 }
 
 // ─── Approvals ────────────────────────────────────────────────────────────────

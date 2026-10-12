@@ -7,7 +7,7 @@ import { withCache, invalidateByPrefix } from "../../lib/cache";
 // ─── Cache invalidation ─────────────────────────────────────
 // Any mutation to source data clears the derived analytics keys so
 // the next dashboard render recomputes fresh numbers.
-const ANALYTICS_PREFIXES = ["ratingStats_", "branchPerf_", "monthlyTrends_", "satisfaction_", "dashboard_summary_"];
+const ANALYTICS_PREFIXES = ["ratingStats_", "branchPerf_", "monthlyTrends_", "satisfaction_", "dashboard_summary_", "dashboard_home_"];
 
 // Feedback arrives in bursts (a dinner rush can submit dozens in a minute).
 // Wiping every analytics key on each submission makes the dashboard recompute

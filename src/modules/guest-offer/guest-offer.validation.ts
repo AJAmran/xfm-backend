@@ -37,7 +37,7 @@ export const approvalStatusSchema = z.object({
 export const guestOfferQuerySchema = z.object({
   page: z.string().optional().default("1"),
   limit: z.string().optional().default("10"),
-  sortBy: z.string().optional().default("logDate"),
+  sortBy: z.enum(["logDate", "guestName", "createdAt"]).optional().default("logDate"),
   sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
   branchId: z.string().optional(),
   logDate: z.string().optional(),

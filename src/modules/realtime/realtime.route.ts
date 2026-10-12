@@ -12,6 +12,7 @@ router.get(
     Role.ADMIN,
     Role.DIRECTOR,
     Role.MANAGER,
+    Role.DOCUMENT_OFFICER,
     Role.BRANCH_MANAGER,
     Role.COO,
     Role.MD,

@@ -13,6 +13,7 @@ import {
   resolveDownload,
   readStoredAsset,
   deleteStoredAsset,
+  deleteAssetIfUnreferenced,
   activeProvider,
   sha256,
   type StoredAsset,
@@ -21,6 +22,7 @@ import {
 import { generateFinalSignedPdf, countPdfPages } from "../../lib/document-pdf.service";
 import { recordAudit, recordAuditInTransaction, getDocumentAudit } from "./document-audit.service";
 import { notifyUser, notifyUsers } from "./document-notification.service";
+import { sendApprovalMail } from "../../lib/approval-mailer";
 import { getDocumentPolicy } from "./document-policy.service";
 import {
   assertStepDecidable,
@@ -897,6 +899,22 @@ export async function submitDocument(
     actorUserId: user.id,
   });
 
+  // Whoever is first in the approval serial gets mail, same as the bell.
+  // Fire-and-forget: SMTP latency must never slow the response, and a mail
+  // failure must never fail the submission (sendApprovalMail never throws).
+  void sendApprovalMail({
+    toUserId: first.id,
+    subject: `Action required: "${document.title}" needs your approval (X-Group Documents)`,
+    heading: "Your approval is needed",
+    intro: `${user.name} submitted a document and you are approver 1 of ${candidates.length}.`,
+    rows: [
+      { label: "Document", value: document.title },
+      { label: "Number", value: document.documentNumber },
+    ],
+    ctaLabel: "Open approvals inbox",
+    ctaPath: "/dashboard/approvals",
+  });
+
   await invalidateDocumentCaches();
   publishDataChanged("document.submitted", { type: "global" });
 
@@ -1165,7 +1183,36 @@ export async function approveAndSign(
         branchId: document.branchId,
         actorUserId: user.id,
       });
+      // The serial moves on: the next approver gets mail, same as the bell.
+      void sendApprovalMail({
+        toUserId: nextStep.approverUserId,
+        subject: `Action required: "${document.title}" is now with you (X-Group Documents)`,
+        heading: "Your approval is needed",
+        intro: `${signer.name} approved step ${step.stepOrder} of ${instance.totalSteps}. The document is now with you.`,
+        rows: [
+          { label: "Document", value: document.title },
+          { label: "Number", value: document.documentNumber },
+        ],
+        ctaLabel: "Open approvals inbox",
+        ctaPath: "/dashboard/approvals",
+      });
     }
+  }
+
+  // The serial is complete: the creator gets mail that it is approved.
+  if (outcome.kind === "FINALISE") {
+    void sendApprovalMail({
+      toUserId: document.createdByUserId,
+      subject: `"${document.title}" fully approved (X-Group Documents)`,
+      heading: "Document approved and locked",
+      intro: `All ${instance.totalSteps} approver(s) signed. The final signed PDF has been generated.`,
+      rows: [
+        { label: "Document", value: document.title },
+        { label: "Number", value: document.documentNumber },
+      ],
+      ctaLabel: "View document",
+      ctaPath: "/dashboard/documents",
+    });
   }
 
   await invalidateDocumentCaches();
@@ -1233,6 +1280,20 @@ export async function rejectDocument(
     documentId: id,
     branchId: document.branchId,
     actorUserId: user.id,
+  });
+
+  void sendApprovalMail({
+    toUserId: document.createdByUserId,
+    subject: `"${document.title}" was rejected (X-Group Documents)`,
+    heading: "Document rejected",
+    intro: `${user.name} rejected the document at step ${step.stepOrder}.`,
+    rows: [
+      { label: "Document", value: document.title },
+      { label: "Number", value: document.documentNumber },
+      { label: "Reason", value: payload.reason },
+    ],
+    ctaLabel: "View document",
+    ctaPath: "/dashboard/documents",
   });
 
   await invalidateDocumentCaches();
@@ -1303,6 +1364,20 @@ export async function requestChanges(
     documentId: id,
     branchId: document.branchId,
     actorUserId: user.id,
+  });
+
+  void sendApprovalMail({
+    toUserId: document.createdByUserId,
+    subject: `Changes requested on "${document.title}" (X-Group Documents)`,
+    heading: "Changes requested",
+    intro: `${user.name} returned the document for revision.`,
+    rows: [
+      { label: "Document", value: document.title },
+      { label: "Number", value: document.documentNumber },
+      { label: "Reason", value: payload.reason },
+    ],
+    ctaLabel: "View document",
+    ctaPath: "/dashboard/documents",
   });
 
   await invalidateDocumentCaches();
@@ -1674,6 +1749,42 @@ export async function deleteDocument(id: number, user: AuthUser) {
   }
 
   await prisma.document.update({ where: { id }, data: { isDeleted: true } });
+
+  // The document is gone for good (no restore path), so its files leave
+  // Cloudinary/disk too — unless another row still references an asset (a
+  // signature shared with a live profile is never destroyed). DB rows stay
+  // for the audit trail; the app filters soft-deleted documents everywhere.
+  const [staleFiles, stalePlacements] = await Promise.all([
+    prisma.documentFile.findMany({
+      where: { documentId: id },
+      select: { storageProvider: true, storageId: true, resourceType: true },
+    }),
+    prisma.signaturePlacement.findMany({
+      where: { workflowStep: { workflowInstance: { documentId: id } } },
+      select: { signatureProvider: true, signatureStorageId: true },
+    }),
+  ]);
+  for (const file of staleFiles) {
+    await deleteAssetIfUnreferenced(
+      {
+        provider: file.storageProvider as StorageProviderValue,
+        storageId: file.storageId,
+        resourceType: file.resourceType,
+      },
+      { excludeDocumentId: id },
+    );
+  }
+  for (const placement of stalePlacements) {
+    await deleteAssetIfUnreferenced(
+      {
+        provider: placement.signatureProvider as StorageProviderValue,
+        storageId: placement.signatureStorageId,
+        resourceType: "image",
+      },
+      { excludeDocumentId: id },
+    );
+  }
+
   await invalidateDocumentCaches();
   publishDataChanged("document.deleted", { type: "global" });
   return { id };

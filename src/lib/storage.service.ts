@@ -8,6 +8,7 @@ import { appError } from "../utils/appError";
 import { logger } from "./logger";
 import { cloudinary } from "./cloudinary";
 import env from "../config/env";
+import { prisma } from "./prisma";
 
 /**
  * File storage for the document approval module.
@@ -287,6 +288,54 @@ export async function deleteStoredAsset(asset: StoredAssetRef): Promise<void> {
     // Cleanup failures must never fail the caller's business operation.
     logger.warn({ err: error, storageId: asset.storageId }, "failed to delete stored asset");
   }
+}
+
+/**
+ * Deletes a stored asset only when nothing references it anymore.
+ *
+ * References are counted across every table that can point at an asset —
+ * live user signatures, frozen signature placements, and document files —
+ * matched by storage id alone (never by provider, so a legacy row with a
+ * blank provider can never cause a live asset to be destroyed: the count
+ * only ever over-retains, never over-deletes).
+ *
+ * `excludeDocumentId` skips that document's own file + placement rows: on
+ * document soft-delete those rows stay (audit trail) but retire with the
+ * document, so they must not pin the bytes. Anything referenced anywhere
+ * else — another document's placement, a live user signature — still blocks.
+ *
+ * This is what keeps Cloudinary/disk free of orphans on signature replace /
+ * remove and document delete, while historical approvals keep rendering
+ * exactly as they were signed. Never throws (see deleteStoredAsset).
+ */
+export async function deleteAssetIfUnreferenced(
+  asset: StoredAssetRef,
+  opts?: { excludeDocumentId?: number },
+): Promise<"deleted" | "retained"> {
+  const exclude = opts?.excludeDocumentId;
+  const [users, placements, files] = await Promise.all([
+    prisma.user.count({ where: { signatureAssetId: asset.storageId } }),
+    prisma.signaturePlacement.count({
+      where: {
+        signatureStorageId: asset.storageId,
+        ...(exclude !== undefined
+          ? { workflowStep: { workflowInstance: { documentId: { not: exclude } } } }
+          : {}),
+      },
+    }),
+    prisma.documentFile.count({
+      where: {
+        storageId: asset.storageId,
+        ...(exclude !== undefined ? { documentId: { not: exclude } } : {}),
+      },
+    }),
+  ]);
+  if (users + placements + files > 0) {
+    logger.info({ storageId: asset.storageId, users, placements, files }, "asset retained: still referenced");
+    return "retained";
+  }
+  await deleteStoredAsset(asset);
+  return "deleted";
 }
 
 export { LOCAL_ROOT };

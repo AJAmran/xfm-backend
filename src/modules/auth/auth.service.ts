@@ -10,6 +10,9 @@ import {
   setRefreshFamily,
 } from "../../lib/cache";
 import env from "../../config/env";
+import { ROLE_SLUGS } from "../../lib/permission-catalog";
+import { permissionsForRole } from "../../lib/permissions";
+import { ROLE_HIERARCHY_RANK, type RankedRole } from "../../lib/role-hierarchy";
 
 /** How long a refresh-token family is tracked in cache (lifetime + margin). */
 const REFRESH_FAMILY_TTL_SECONDS =
@@ -32,11 +35,12 @@ export async function loginUser(payload: { email: string; password: string }) {
     },
   });
 
-  if (!user) throw appError("No account found matching that email address", httpStatus.NOT_FOUND);
-  if (!user.isActive) throw appError("Your account has been suspended", httpStatus.FORBIDDEN);
+  // One identical response for missing account, suspended account and wrong
+  // password: distinct 404/403/401 messages were an email + state oracle.
+  if (!user || !user.isActive) throw appError("Invalid email or password", httpStatus.UNAUTHORIZED);
 
   const valid = await bcrypt.compare(payload.password, user.password);
-  if (!valid) throw appError("Incorrect password", httpStatus.UNAUTHORIZED);
+  if (!valid) throw appError("Invalid email or password", httpStatus.UNAUTHORIZED);
 
   // Clear any stale session snapshot / refresh family from a previous login,
   // then seed a fresh refresh family so rotation & reuse detection work.
@@ -88,7 +92,7 @@ export async function refreshAccessToken(token: string) {
     where: { id: decoded.id, isDeleted: false },
     select: { id: true, email: true, role: true, isActive: true, tokenVersion: true },
   });
-  if (!user || !user.isActive) throw appError("Invalid security context for session rotation", httpStatus.FORBIDDEN);
+  if (!user || !user.isActive) throw appError("Session expired. Please log in again", httpStatus.UNAUTHORIZED);
   if (user.tokenVersion !== (decoded.tokenVersion ?? 0)) {
     throw appError("Session revoked. Please log in again", httpStatus.UNAUTHORIZED);
   }
@@ -165,5 +169,19 @@ export async function getCurrentUser(userId: number) {
     },
   });
   if (!user) throw appError("User not found", httpStatus.NOT_FOUND);
-  return user;
+
+  // Effective permission keys for this role, resolved from the
+  // `role_permissions` config row (catalog defaults when absent). Additive
+  // only — existing clients keep reading `role`; permission-aware clients
+  // read `permissions`.
+  const permissions = await permissionsForRole(user.role);
+  return {
+    ...user,
+    permissions,
+    roleMeta: {
+      slug: ROLE_SLUGS[user.role] ?? user.role.toLowerCase().replace(/_/g, "-"),
+      rank: ROLE_HIERARCHY_RANK[user.role as RankedRole] ?? null,
+      isSystem: true,
+    },
+  };
 }

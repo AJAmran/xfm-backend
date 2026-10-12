@@ -15,13 +15,18 @@ export const updateUserSchema = z.object({
   password: z.string().min(8).optional(),
   role: z.nativeEnum(Role).optional(),
   branchId: z.number().int().positive().nullable().optional(),
+  // `isActive` stays editable here (the edit dialog carries a status toggle)
+  // but the service rank-guards it: self-deactivation is always rejected and
+  // deactivating a senior account requires outranking it.
   isActive: z.boolean().optional(),
 });
+
+export const userIdParamSchema = z.object({ id: z.string().regex(/^\d+$/, "Invalid id") }).strict();
 
 export const userQuerySchema = z.object({
   page: z.string().optional().default("1"),
   limit: z.string().optional().default("10"),
-  sortBy: z.string().optional().default("createdAt"),
+  sortBy: z.enum(["name", "email", "role", "createdAt"]).optional().default("createdAt"),
   sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
   search: z.string().optional(),
   role: z.nativeEnum(Role).optional(),

@@ -3,7 +3,7 @@ import * as documentController from "./document.controller";
 import { authGuard } from "../../middleware/auth";
 import { validateSchema } from "../../middleware/validation";
 import { Role } from "../../../generated/prisma/enums";
-import { approvalQuerySchema } from "./document.validation";
+import { approvalQuerySchema, createDocumentApproversSchema } from "./document.validation";
 
 const router = Router();
 
@@ -19,6 +19,7 @@ router.use(
     Role.ADMIN,
     Role.DIRECTOR,
     Role.MANAGER,
+    Role.DOCUMENT_OFFICER,
     Role.BRANCH_MANAGER,
     Role.COO,
     Role.MD,
@@ -27,6 +28,6 @@ router.use(
 
 router.get("/pending", validateSchema({ query: approvalQuerySchema }), documentController.pending);
 router.get("/history", validateSchema({ query: approvalQuerySchema }), documentController.history);
-router.post("/validate-sequence", documentController.validateSequence);
+router.post("/validate-sequence", validateSchema({ body: createDocumentApproversSchema }), documentController.validateSequence);
 
 export { router as ApprovalRoutes };

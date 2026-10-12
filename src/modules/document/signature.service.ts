@@ -1,7 +1,12 @@
 import httpStatus from "http-status";
 import { prisma } from "../../lib/prisma";
 import { appError } from "../../utils/appError";
-import { storeBuffer, activeProvider } from "../../lib/storage.service";
+import {
+  storeBuffer,
+  activeProvider,
+  deleteAssetIfUnreferenced,
+  type StorageProviderValue,
+} from "../../lib/storage.service";
 import { recordAudit } from "./document-audit.service";
 import { logger } from "../../lib/logger";
 
@@ -53,7 +58,7 @@ export async function getOwnSignature(userId: number) {
 export async function replaceOwnSignature(userId: number, upload: Express.Multer.File) {
   const user = await prisma.user.findFirst({
     where: { id: userId, isDeleted: false },
-    select: { id: true, name: true, signatureAssetId: true, signatureUrl: true },
+    select: { id: true, name: true, signatureAssetId: true, signatureProvider: true, signatureUrl: true },
   });
   if (!user) throw appError("User not found", httpStatus.NOT_FOUND);
 
@@ -81,8 +86,19 @@ export async function replaceOwnSignature(userId: number, upload: Express.Multer
 
   logger.info(
     { userId, previousAssetId: user.signatureAssetId, newAssetId: stored.storageId, provider: stored.provider },
-    "user signature replaced; previous asset retained for historical approvals",
+    "user signature replaced; previous asset cleaned when unreferenced",
   );
+
+  // The old asset leaves Cloudinary/disk unless a frozen SignaturePlacement
+  // still references it — historical approvals keep rendering exactly as
+  // signed, everything else is cleaned up (never throws).
+  if (user.signatureAssetId && user.signatureAssetId !== stored.storageId) {
+    await deleteAssetIfUnreferenced({
+      provider: (user.signatureProvider ?? "LOCAL_SECURE") as StorageProviderValue,
+      storageId: user.signatureAssetId,
+      resourceType: "image",
+    });
+  }
 
   return {
     userId,
@@ -103,7 +119,7 @@ export async function replaceOwnSignature(userId: number, upload: Express.Multer
 export async function clearOwnSignature(userId: number) {
   const user = await prisma.user.findFirst({
     where: { id: userId, isDeleted: false },
-    select: { id: true, signatureAssetId: true },
+    select: { id: true, signatureAssetId: true, signatureProvider: true },
   });
   if (!user) throw appError("User not found", httpStatus.NOT_FOUND);
 
@@ -123,9 +139,18 @@ export async function clearOwnSignature(userId: number) {
     data: { signatureAssetId: null, signatureProvider: null, signatureUrl: null },
   });
 
-  // The asset itself is retained: historical `SignaturePlacement` rows still
-  // reference it and must keep rendering exactly as they were signed.
-  logger.info({ userId, retainedAssetId: user.signatureAssetId }, "saved signature detached from profile");
+  // The detached asset leaves Cloudinary/disk unless a frozen
+  // SignaturePlacement still references it (never throws).
+  if (user.signatureAssetId) {
+    await deleteAssetIfUnreferenced({
+      provider: (user.signatureProvider ?? "LOCAL_SECURE") as StorageProviderValue,
+      storageId: user.signatureAssetId,
+      resourceType: "image",
+    });
+    logger.info({ userId }, "saved signature detached from profile");
+  } else {
+    logger.info({ userId }, "saved signature detached from profile (no asset to clean)");
+  }
 
   return { userId, hasSignature: false };
 }
